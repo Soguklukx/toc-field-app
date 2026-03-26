@@ -471,6 +471,7 @@ input[type="checkbox"]{width:auto;accent-color:var(--cyan)}
 <script>
 
 'use strict';
+window._skipFbSave = false; // evita ciclo cuando se carga de Firestore
 
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
@@ -634,6 +635,9 @@ function delEvid(otId, sec, idx){
 
 function saveEvidencias(){
   try{ localStorage.setItem(LS_EV, JSON.stringify(STATE.evidencias)); }catch(e){}
+  if(window.fbSaveEvidencias && !window._skipFbSave){
+    window.fbSaveEvidencias(STATE.evidencias).catch(e=>console.warn('Ev sync:',e));
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -732,6 +736,13 @@ async function hFI(inp, sec, phase='antes'){
   const files=Array.from(inp.files); const meta=wmMeta();
   for(const f of files){
     const fd=await procFile(f,meta); fd.phase=phase;
+    // Subir imagen watermarked a Firebase Storage para sincronizar entre dispositivos
+    if(window.subirBase64 && fd.watermarked && !f.type.startsWith('video/')){
+      try{
+        const ext=(f.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'');
+        fd.url=await window.subirBase64(fd.watermarked,'wm_'+Date.now()+'.'+ext);
+      }catch(e){console.warn('Upload foto fallido:',e);}
+    }
     addEvid(ot.id,sec,fd);
     // Notificar actividad del personal
     const u=STATE.currentUser;
@@ -762,7 +773,7 @@ function prevs(sec, phase='antes'){
     const isVideo=f.type&&f.type.startsWith('video/');
     const thumb=isVideo
       ? `<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;font-size:2rem">▶️</div>`
-      : `<img src="${f.watermarked}" alt="${f.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
+      : `<img src="${f.url||f.watermarked}" alt="${f.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
     return`<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${otId}','${sec}',${i})">
       ${thumb}
       <button onclick="event.stopPropagation();delEvidUI('${sec}',${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.7rem;z-index:2">✕</button>
@@ -809,7 +820,7 @@ function lbxOpen(otId,sec,idx){
   _lbxOtId=otId; _lbxSec=sec; _lbxIdx=idx;
   const cap=`${f.name} — ${sec} (${idx+1}/${evs.length})`;
   const isVideo=f.type&&f.type.startsWith('video/');
-  const src=isVideo?(f.original||f.watermarked):f.watermarked;
+  const src=isVideo?(f.url||f.original||f.watermarked):(f.url||f.watermarked);
   const el=document.getElementById('lbx');
   if(!el) return;
   const imgEl=document.getElementById('lbx-img');
@@ -2414,65 +2425,93 @@ function genInformeGraficasSolo(){
    INIT – DOMContentLoaded
    ═══════════════════════════════════════════════════════════ */
 
-document.addEventListener('DOMContentLoaded',()=>{
-  /* ── Cargar estado persistido ── */
+/* ── Carga localStorage (sincrónico, fallback inmediato) ── */
+function _loadFromLocalStorage(){
   try{
     const raw=localStorage.getItem(LS_KEY);
-    if(raw){
-      const s=JSON.parse(raw);
-      STATE.notifs=s.notifs||[];
-      STATE.contratistas=s.contratistas||DEFAULT_CONTRATISTAS;
-      STATE.ots=s.ots||[];
-      STATE.solicitudesUsuario=s.solicitudesUsuario||[];
-    } else {
-      STATE.contratistas=DEFAULT_CONTRATISTAS;
-      STATE.ots=[];
-    }
-  }catch(e){
-    STATE.contratistas=DEFAULT_CONTRATISTAS;
-    STATE.ots=[];
+    if(raw){const s=JSON.parse(raw);STATE.notifs=s.notifs||[];STATE.contratistas=s.contratistas||DEFAULT_CONTRATISTAS;STATE.ots=s.ots||[];STATE.solicitudesUsuario=s.solicitudesUsuario||[];}
+    else{STATE.contratistas=DEFAULT_CONTRATISTAS;STATE.ots=[];}
+  }catch(e){STATE.contratistas=DEFAULT_CONTRATISTAS;STATE.ots=[];}
+  try{const evRaw=localStorage.getItem(LS_EV);if(evRaw)STATE.evidencias=JSON.parse(evRaw);}catch(e){}
+  try{const c=localStorage.getItem(LS_CAT);STATE.catalog=c?JSON.parse(c):[...ITEM_CATALOG];}catch(e){STATE.catalog=[...ITEM_CATALOG];}
+  try{const cg=localStorage.getItem(LS_CAT_GAR);STATE.catalogGar=cg?JSON.parse(cg):[...ITEM_CATALOG_GAR];}catch(e){STATE.catalogGar=[...ITEM_CATALOG_GAR];}
+  try{const ep=localStorage.getItem(LS_EPP);STATE.eppCatalog=ep?JSON.parse(ep):[...DEFAULT_EPP];}catch(e){STATE.eppCatalog=[...DEFAULT_EPP];}
+  try{const u=localStorage.getItem(LS_USERS);STATE.users=u?JSON.parse(u):[...DEFAULT_USERS];}catch(e){STATE.users=[...DEFAULT_USERS];}
+}
+
+/* ── Pantalla de carga ── */
+function _showSplash(msg){
+  const app=document.getElementById('app');
+  if(app) app.innerHTML=`<div style="position:fixed;inset:0;background:#0A1628;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Syne,sans-serif">
+    <div style="font-size:3rem">⚡</div>
+    <div style="font-size:1.1rem;font-weight:800;color:#00E5C3">TOC MTTO App</div>
+    <div style="font-size:.82rem;color:#8FA3B8">${msg}</div>
+    <div style="width:180px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:6px">
+      <div id="splashBar" style="height:100%;width:0%;background:linear-gradient(90deg,#00E5C3,#FF7240);border-radius:2px;transition:width .4s ease"></div>
+    </div>
+  </div>`;
+}
+function _splashPct(p){const b=document.getElementById('splashBar');if(b)b.style.width=p+'%';}
+
+document.addEventListener('DOMContentLoaded',async()=>{
+  _showSplash('Cargando datos locales…');
+  _splashPct(15);
+
+  /* 1. Cargar localStorage primero para tener datos inmediatos */
+  _loadFromLocalStorage();
+  _splashPct(35);
+
+  /* 2. Intentar sincronizar con Firestore (esperar máx 6s) */
+  let fbOk=false;
+  const fbReady=new Promise(res=>{
+    const t=setTimeout(()=>res(false),6000); // timeout 6s
+    const check=setInterval(()=>{
+      if(window.fbLoad){clearInterval(check);clearTimeout(t);res(true);}
+    },80);
+  });
+
+  const fbAvailable=await fbReady;
+  _splashPct(55);
+
+  if(fbAvailable){
+    _showSplash('Sincronizando con la nube…');
+    try{
+      const fbData=await Promise.race([window.fbLoad(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),7000))]);
+      if(fbData&&fbData.ots!==undefined){
+        window._skipFbSave=true;
+        // Firestore tiene datos → usar como fuente de verdad
+        STATE.notifs=fbData.notifs||STATE.notifs;
+        STATE.contratistas=fbData.contratistas||STATE.contratistas;
+        STATE.ots=fbData.ots||STATE.ots;
+        STATE.solicitudesUsuario=fbData.solicitudesUsuario||[];
+        if(fbData.users&&fbData.users.length) STATE.users=fbData.users;
+        if(fbData.catalog&&fbData.catalog.length) STATE.catalog=fbData.catalog;
+        if(fbData.catalogGar&&fbData.catalogGar.length) STATE.catalogGar=fbData.catalogGar;
+        if(fbData.eppCatalog&&fbData.eppCatalog.length) STATE.eppCatalog=fbData.eppCatalog;
+        // Persistir en localStorage
+        try{
+          localStorage.setItem(LS_KEY,JSON.stringify({notifs:STATE.notifs,contratistas:STATE.contratistas,ots:STATE.ots,solicitudesUsuario:STATE.solicitudesUsuario}));
+          localStorage.setItem(LS_USERS,JSON.stringify(STATE.users));
+          localStorage.setItem(LS_CAT,JSON.stringify(STATE.catalog));
+          localStorage.setItem(LS_CAT_GAR,JSON.stringify(STATE.catalogGar));
+          localStorage.setItem(LS_EPP,JSON.stringify(STATE.eppCatalog));
+        }catch(e){}
+        window._skipFbSave=false;
+        fbOk=true;
+      }
+    }catch(e){ console.warn('FB load error:',e); window._skipFbSave=false; }
   }
+  _splashPct(80);
 
-  /* Cargar evidencias */
-  try{
-    const evRaw=localStorage.getItem(LS_EV);
-    if(evRaw) STATE.evidencias=JSON.parse(evRaw);
-  }catch(e){}
-
-  /* Cargar catálogos */
-  try{
-    const catRaw=localStorage.getItem(LS_CAT);
-    if(catRaw) STATE.catalog=JSON.parse(catRaw);
-    else STATE.catalog=[...ITEM_CATALOG];
-  }catch(e){STATE.catalog=[...ITEM_CATALOG];}
-
-  try{
-    const catGRaw=localStorage.getItem(LS_CAT_GAR);
-    if(catGRaw) STATE.catalogGar=JSON.parse(catGRaw);
-    else STATE.catalogGar=[...ITEM_CATALOG_GAR];
-  }catch(e){STATE.catalogGar=[...ITEM_CATALOG_GAR];}
-
-  /* Cargar catálogo EPP */
-  try{
-    const eppRaw=localStorage.getItem(LS_EPP);
-    if(eppRaw) STATE.eppCatalog=JSON.parse(eppRaw);
-    else STATE.eppCatalog=[...DEFAULT_EPP];
-  }catch(e){STATE.eppCatalog=[...DEFAULT_EPP];}
-
-  /* Cargar usuarios */
-  try{
-    const uRaw=localStorage.getItem(LS_USERS);
-    if(uRaw) STATE.users=JSON.parse(uRaw);
-    else STATE.users=[...DEFAULT_USERS];
-  }catch(e){STATE.users=[...DEFAULT_USERS];}
-
-  /* Crear OTs demo si no hay ninguna */
+  /* 3. OTs demo si no hay ninguna */
   if(STATE.ots.length===0){
     createDemoOTs();
     save();
   }
 
-  /* Verificar sesión existente */
+  _splashPct(95);
+
+  /* 4. Verificar sesión existente */
   try{
     const sessRaw=localStorage.getItem(LS_SESS);
     if(sessRaw){
@@ -2481,8 +2520,10 @@ document.addEventListener('DOMContentLoaded',()=>{
         const u=STATE.users.find(x=>x.usuario===sess.user);
         if(u){
           STATE.currentUser=u;
+          _splashPct(100);
           renderMain('');
           checkNotifs();
+          if(fbOk) setTimeout(()=>_showSyncDot(true),500);
           routeByRole();
           return;
         }
@@ -2490,7 +2531,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   }catch(e){}
 
-  /* Mostrar login */
+  _splashPct(100);
   showLogin();
 });
 
@@ -5102,7 +5143,7 @@ function getOT(id){return(STATE.ots||[]).find(o=>o.id===id)||null;}
 /* Obtener contratista por ID */
 function getContratista(id){return(STATE.contratistas||DEFAULT_CONTRATISTAS).find(c=>c.id===id)||null;}
 
-/* Guardar en localStorage */
+/* Guardar en localStorage + Firestore */
 function save(){
   try{
     localStorage.setItem(LS_KEY,JSON.stringify({
@@ -5122,9 +5163,74 @@ function save(){
       localStorage.setItem(LS_KEY,JSON.stringify({notifs:[],contratistas:STATE.contratistas||[],ots:STATE.ots||[]}));
     }catch(e2){console.error('Storage error:',e2);}
   }
+  // Sincronizar con Firestore (async, no bloquea UI)
+  if(window.fbSave && !window._skipFbSave){
+    window.fbSave({
+      notifs:STATE.notifs||[],
+      contratistas:STATE.contratistas||DEFAULT_CONTRATISTAS,
+      ots:STATE.ots||[],
+      solicitudesUsuario:STATE.solicitudesUsuario||[],
+      users:STATE.users||DEFAULT_USERS,
+      catalog:STATE.catalog||ITEM_CATALOG,
+      catalogGar:STATE.catalogGar||ITEM_CATALOG_GAR,
+      eppCatalog:STATE.eppCatalog||DEFAULT_EPP
+    }).then(()=>_showSyncDot(true)).catch(e=>{console.warn('Firebase sync error:',e);_showSyncDot(false);});
+  }
 }
 
-/* Toast de notificación temporal */
+/* Indicador visual de sincronización ☁️ en navbar */
+function _showSyncDot(ok){
+  const el=document.getElementById('syncDot');
+  if(!el)return;
+  el.textContent=ok?'☁️✓':'☁️!';
+  el.title=ok?'Sincronizado con la nube':'Error al sincronizar';
+  el.style.color=ok?'var(--ok)':'var(--warn)';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{el.textContent='☁️';el.style.color='var(--g3)';},4000);
+}
+
+/* Forzar recarga de datos desde Firestore */
+async function syncFromCloud(){
+  if(!window.fbLoad){showToast('Firebase no disponible','warn');return;}
+  showToast('⏳ Sincronizando...','info');
+  try{
+    const fbData=await window.fbLoad();
+    if(fbData&&fbData.ots!==undefined){
+      window._skipFbSave=true;
+      STATE.notifs=fbData.notifs||[];
+      STATE.contratistas=fbData.contratistas||DEFAULT_CONTRATISTAS;
+      STATE.ots=fbData.ots||[];
+      STATE.solicitudesUsuario=fbData.solicitudesUsuario||[];
+      if(fbData.users&&fbData.users.length) STATE.users=fbData.users;
+      if(fbData.catalog&&fbData.catalog.length) STATE.catalog=fbData.catalog;
+      if(fbData.catalogGar&&fbData.catalogGar.length) STATE.catalogGar=fbData.catalogGar;
+      if(fbData.eppCatalog&&fbData.eppCatalog.length) STATE.eppCatalog=fbData.eppCatalog;
+      // Evidencias: mezclar firebase (URLs) con local (base64)
+      if(window.fbLoadEvidencias){
+        const otIds=STATE.ots.map(o=>o.id);
+        if(otIds.length){
+          const fbEv=await window.fbLoadEvidencias(otIds);
+          const localEvRaw=localStorage.getItem(LS_EV);
+          const localEv=localEvRaw?JSON.parse(localEvRaw):{};
+          STATE.evidencias=Object.assign({},fbEv,localEv);
+        }
+      }
+      try{
+        localStorage.setItem(LS_KEY,JSON.stringify({notifs:STATE.notifs,contratistas:STATE.contratistas,ots:STATE.ots,solicitudesUsuario:STATE.solicitudesUsuario||[]}));
+        localStorage.setItem(LS_USERS,JSON.stringify(STATE.users));
+        localStorage.setItem(LS_CAT,JSON.stringify(STATE.catalog));
+        localStorage.setItem(LS_CAT_GAR,JSON.stringify(STATE.catalogGar));
+        localStorage.setItem(LS_EPP,JSON.stringify(STATE.eppCatalog));
+        localStorage.setItem(LS_EV,JSON.stringify(STATE.evidencias));
+      }catch(e){}
+      window._skipFbSave=false;
+      checkNotifs();
+      showToast('✅ Datos actualizados desde la nube','ok');
+      routeByRole();
+    } else { showToast('⚠️ No hay datos en la nube aún','warn'); }
+  }catch(e){ console.warn('Sync error:',e); showToast('❌ Error al sincronizar','danger'); window._skipFbSave=false; }
+}
+
 function showToast(msg,tipo='info'){
   let toast=document.getElementById('toast');
   if(!toast){
@@ -5232,6 +5338,7 @@ function renderMain(html){
     <nav class="navbar">
       <button class="nav-logo" onclick="routeByRole()">⚡ TOC MTTO</button>
       <div style="display:flex;gap:8px;align-items:center">
+        <button id="syncDot" onclick="syncFromCloud()" title="Sincronizar con la nube" style="background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--g3);padding:4px 6px;border-radius:6px" title="Sync">☁️</button>
         ${isNotifRole?`<button class="btn-notif" onclick="panelNotifs()" title="Notificaciones">
           🔔<span id="notifBadge" class="notif-badge" style="display:${notifCount>0?'flex':'none'}">${notifCount||''}</span>
         </button>`:''}
@@ -7248,42 +7355,131 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script type="module">
-console.log("Firebase cargando 🔥");
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+// ═══════════════════════════════════════════════════════════
+// FIREBASE + FIRESTORE SYNC — TOC MTTO Field App
+// ═══════════════════════════════════════════════════════════
+import { initializeApp }                               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc,
+         collection, getDocs, writeBatch }             from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes,
+         uploadString, getDownloadURL }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-// Tu configuración
 const firebaseConfig = {
-  apiKey: "AIzaSyCzgyshs_VEvto8-xgVyyYVnSkoeTYKlXk",
-  authDomain: "toc-field-app-c2695.firebaseapp.com",
-  projectId: "toc-field-app-c2695",
-  storageBucket: "toc-field-app-c2695.firebasestorage.app",
+  apiKey:            "AIzaSyCzgyshs_VEvto8-xgVyyYVnSkoeTYKlXk",
+  authDomain:        "toc-field-app-c2695.firebaseapp.com",
+  projectId:         "toc-field-app-c2695",
+  storageBucket:     "toc-field-app-c2695.firebasestorage.app",
   messagingSenderId: "344071269176",
-  appId: "1:344071269176:web:c86fd1da013e4755d7afcd",
-  measurementId: "G-PLSSV91JVP"
+  appId:             "1:344071269176:web:ed07dbc555b0dda4d7afcd"
 };
 
-// Inicializar Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const app     = initializeApp(firebaseConfig);
+const db      = getFirestore(app);
 const storage = getStorage(app);
 
-// 🔥 FUNCIÓN PARA SUBIR FOTO
-window.subirFoto = async function(file) {
-  const nombre = Date.now() + "_" + file.name;
-  const referencia = ref(storage, "fotos/" + nombre);
-
-  await uploadBytes(referencia, file);
-  const url = await getDownloadURL(referencia);
-
-  return url;
+// ── Subir archivo File (foto original desde garantía, etc.)
+window.subirFoto = async function(file){
+  const nombre = Date.now()+"_"+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const r = ref(storage,"fotos/"+nombre);
+  await uploadBytes(r,file);
+  return getDownloadURL(r);
 };
 
-// 🔥 FUNCIÓN PARA GUARDAR DATOS
-window.guardarDato = async function(data) {
-  await addDoc(collection(db, "reportes"), data);
+// ── Subir base64 watermarked (evidencias de campo)
+window.subirBase64 = async function(dataUrl, nombre){
+  const r = ref(storage,"evidencias/"+Date.now()+"_"+(nombre||'foto.jpg'));
+  await uploadString(r, dataUrl, 'data_url');
+  return getDownloadURL(r);
 };
+
+// ── GUARDAR todo el estado en Firestore
+window.fbSave = async function(data){
+  // Separar OTs (cada una en su propio doc para evitar límite 1MB)
+  const ots   = data.ots   || [];
+  const users = data.users || [];
+
+  // Config general (sin OTs para no exceder el límite del doc)
+  await setDoc(doc(db,'toc_config','main'),{
+    notifs:             data.notifs             || [],
+    contratistas:       data.contratistas       || [],
+    solicitudesUsuario: data.solicitudesUsuario || [],
+    catalog:            data.catalog            || [],
+    catalogGar:         data.catalogGar         || [],
+    eppCatalog:         data.eppCatalog         || [],
+    users:              users,
+    updatedAt:          Date.now()
+  });
+
+  // OTs: cada una en su propio documento
+  const batch = writeBatch(db);
+  ots.forEach(ot=>{
+    const d = doc(db,'toc_ots', String(ot.id));
+    // Guardar OT sin imágenes base64 (las fotos van en Storage)
+    const otClean = JSON.parse(JSON.stringify(ot));
+    _stripBase64(otClean);
+    batch.set(d, otClean);
+  });
+  await batch.commit();
+};
+
+// ── Quitar base64 de un objeto (recursivo) para no saturar Firestore
+function _stripBase64(obj){
+  if(!obj||typeof obj!=='object') return;
+  for(const k of Object.keys(obj)){
+    if(typeof obj[k]==='string'&&obj[k].startsWith('data:')){
+      obj[k]=''; // limpiar base64 — la URL real está en obj[k.replace('watermarked','url')] o fd.url
+    } else {
+      _stripBase64(obj[k]);
+    }
+  }
+}
+
+// ── CARGAR todo el estado desde Firestore
+window.fbLoad = async function(){
+  const cfgSnap = await getDoc(doc(db,'toc_config','main'));
+  const cfg = cfgSnap.exists() ? cfgSnap.data() : {};
+
+  const otsSnap = await getDocs(collection(db,'toc_ots'));
+  const ots = [];
+  otsSnap.forEach(d=>ots.push(d.data()));
+
+  return {
+    notifs:             cfg.notifs             || [],
+    contratistas:       cfg.contratistas       || [],
+    solicitudesUsuario: cfg.solicitudesUsuario || [],
+    catalog:            cfg.catalog            || [],
+    catalogGar:         cfg.catalogGar         || [],
+    eppCatalog:         cfg.eppCatalog         || [],
+    users:              cfg.users              || [],
+    ots
+  };
+};
+
+// ── GUARDAR evidencias en Firestore (solo URLs, no base64)
+window.fbSaveEvidencias = async function(evidencias){
+  const clean = {};
+  for(const [k,arr] of Object.entries(evidencias)){
+    clean[k] = (arr||[]).map(f=>({
+      name:  f.name  ||'',
+      type:  f.type  ||'',
+      phase: f.phase ||'',
+      url:   f.url   || ''   // solo la URL de Firebase Storage
+    })).filter(f=>f.url); // solo guardar las que tienen URL
+  }
+  if(Object.keys(clean).length===0) return;
+  await setDoc(doc(db,'toc_evidencias','main'), { data: clean, updatedAt: Date.now() });
+};
+
+// ── CARGAR evidencias desde Firestore
+window.fbLoadEvidencias = async function(){
+  try{
+    const snap = await getDoc(doc(db,'toc_evidencias','main'));
+    if(!snap.exists()) return {};
+    return snap.data().data || {};
+  }catch(e){ return {}; }
+};
+
+console.log("🔥 Firebase Firestore sincronización activa");
 </script>
 </body>
 </html>
