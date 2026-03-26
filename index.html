@@ -4035,6 +4035,7 @@ function panelGarantiaItems(otId){
           </div>
           <div class="fg"><label>Imagen de referencia</label>
             <input type="file" accept="image/*" onchange="loadRefImgGar(event,'${otId}',${i})">
+            console.log("GAR 🔥");
             ${item.refImg?`<img src="${item.refImg}" style="max-width:100%;max-height:120px;border-radius:6px;margin-top:6px">`:''}
           </div>
           ${(item.filas||[{id:0,ubic:'',cant:'',largo:'',ancho:'',alto:'',obs:''}]).map((f,fIdx)=>`
@@ -4127,6 +4128,7 @@ function panelItemsAprobados(otId){
             </div>
             <div class="fg"><label>Imagen de referencia de esta fila</label>
               <input type="file" accept="image/*" onchange="loadRefImgFila(event,'${otId}',${i},${fIdx})">
+              console.log("FILA 🔥");
               ${f.refImg?`<img src="${f.refImg}" style="max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;cursor:pointer" onclick="lbxOpenImg('${f.refImg}','Ref fila ${fIdx+1}')">`:''}
             </div>
             <div class="fr3">
