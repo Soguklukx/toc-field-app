@@ -64,6 +64,7 @@ if('serviceWorker' in navigator){
 <!-- Firebase compat (sin módulos ES) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -7384,7 +7385,23 @@ const firebaseConfig = {
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
-const db = firebase.firestore();
+const db      = firebase.firestore();
+const storage = firebase.storage();
+
+// ── Subir archivo File (foto original desde garantía, etc.)
+window.subirFoto = async function(file){
+  const nombre = Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const ref    = storage.ref('fotos/'+nombre);
+  await ref.put(file);
+  return ref.getDownloadURL();
+};
+
+// ── Subir base64 watermarked (evidencias de campo, cámara/galería)
+window.subirBase64 = async function(dataUrl, nombre){
+  const ref = storage.ref('evidencias/'+Date.now()+'_'+(nombre||'foto.jpg'));
+  await ref.putString(dataUrl, 'data_url');
+  return ref.getDownloadURL();
+};
 
 // ── Helper: eliminar base64 antes de escribir en Firestore
 function _stripB64(obj){
@@ -7455,8 +7472,12 @@ db.collection('estado').doc('global').onSnapshot(
 
     window._skipFbSave = false;
 
-    // Re-renderizar la vista actual
-    if(typeof rp==='function') rp(STATE.tab);
+    // Re-renderizar la vista actual (funciona desde cualquier pantalla)
+    if(typeof rp==='function' && typeof curOT==='function' && curOT()){
+      rp(STATE.tab);  // dentro de una OT → re-renderizar tab activo
+    } else if(typeof routeByRole==='function' && STATE.currentUser){
+      routeByRole();  // en dashboard/lista → re-renderizar vista completa
+    }
   },
   function(err){ console.warn('onSnapshot error:',err); }
 );
