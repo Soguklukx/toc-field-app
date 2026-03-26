@@ -751,6 +751,13 @@ async function hFI(inp, sec, phase='antes'){
         fd.url=await window.subirBase64(fd.watermarked,'wm_'+Date.now()+'.'+ext);
       }catch(e){console.warn('Upload foto fallido:',e);}
     }
+    // Subir video original a Firebase Storage
+    if(window.subirVideo && fd.original && f.type.startsWith('video/')){
+      try{
+        const ext=(f.name.split('.').pop()||'mp4').replace(/[^a-zA-Z0-9]/g,'');
+        fd.url=await window.subirVideo(fd.original,'vid_'+Date.now()+'.'+ext);
+      }catch(e){console.warn('Upload video fallido:',e);}
+    }
     addEvid(ot.id,sec,fd);
     // Notificar actividad del personal
     const u=STATE.currentUser;
@@ -7388,19 +7395,33 @@ if (!firebase.apps.length) {
 const db      = firebase.firestore();
 const storage = firebase.storage();
 
+// ── Helper: data URL → Blob (evita putString que falla en mobile)
+function _dataUrlToBlob(dataUrl){
+  return fetch(dataUrl).then(r=>r.blob());
+}
+
 // ── Subir archivo File (foto original desde garantía, etc.)
 window.subirFoto = async function(file){
   const nombre = Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  const ref    = storage.ref('fotos/'+nombre);
-  await ref.put(file);
-  return ref.getDownloadURL();
+  const r      = storage.ref('fotos/'+nombre);
+  const snap   = await r.put(file);
+  return snap.ref.getDownloadURL();
 };
 
-// ── Subir base64 watermarked (evidencias de campo, cámara/galería)
+// ── Subir imagen watermarked en base64 (cámara/galería → imágenes)
 window.subirBase64 = async function(dataUrl, nombre){
-  const ref = storage.ref('evidencias/'+Date.now()+'_'+(nombre||'foto.jpg'));
-  await ref.putString(dataUrl, 'data_url');
-  return ref.getDownloadURL();
+  const blob = await _dataUrlToBlob(dataUrl);
+  const r    = storage.ref('evidencias/'+Date.now()+'_'+(nombre||'foto.jpg'));
+  const snap = await r.put(blob);
+  return snap.ref.getDownloadURL();
+};
+
+// ── Subir video original en base64 (cámara → videos)
+window.subirVideo = async function(dataUrl, nombre){
+  const blob = await _dataUrlToBlob(dataUrl);
+  const r    = storage.ref('videos/'+Date.now()+'_'+(nombre||'video.mp4'));
+  const snap = await r.put(blob);
+  return snap.ref.getDownloadURL();
 };
 
 // ── Helper: eliminar base64 antes de escribir en Firestore
