@@ -7201,15 +7201,28 @@ function upGarFila(otId,itemIdx,filaIdx,field,val){
   item.filas[filaIdx]=item.filas[filaIdx]||{};
   item.filas[filaIdx][field]=val;save();
 }
-function loadRefImgGar(evt,otId,itemIdx){
-  const file=evt.target.files?.[0];if(!file)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    const ot=getOT(otId);if(!ot)return;
-    const item=ot.garantia?.items?.[itemIdx];if(!item)return;
-    item.refImg=e.target.result;save();panelGarantiaItems(otId);
-  };
-  r.readAsDataURL(file);
+async function loadRefImgGar(evt, otId, itemIdx) {
+  const file = evt.target.files?.[0];
+  if (!file) return;
+
+  console.log("Subiendo imagen...");
+
+  // 🔥 SUBIR A FIREBASE
+  const url = await subirFoto(file);
+
+  console.log("Imagen subida:", url);
+
+  const ot = getOT(otId);
+  if (!ot) return;
+
+  const item = ot.garantia?.items?.[itemIdx];
+  if (!item) return;
+
+  // 👇 ahora guarda URL (no base64)
+  item.refImg = url;
+
+  save();
+  panelGarantiaItems(otId);
 }
 
 
@@ -7220,6 +7233,7 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script type="module">
+console.log("Firebase cargando 🔥");
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
