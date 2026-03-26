@@ -4209,19 +4209,32 @@ function upFilaItem(otId,itemIdx,filaIdx,field,val){
   item.filas[filaIdx][field]=val;save();
 }
 
-function loadRefImgFila(evt,otId,itemIdx,filaIdx){
-  const file=evt.target.files?.[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const ot=getOT(otId);if(!ot)return;
-    const item=ot.itemsAprobados[itemIdx];if(!item)return;
-    item.filas=item.filas||[];
-    item.filas[filaIdx]=item.filas[filaIdx]||{};
-    item.filas[filaIdx].refImg=e.target.result;
-    save();panelItemsAprobados(otId);
-  };
-  reader.readAsDataURL(file);
-}
+window.loadRefImgFila = async function(evt, otId, itemIdx, filaIdx) {
+  console.log("FILA 🔥");
+
+  const file = evt.target.files?.[0];
+  if (!file) return;
+
+  console.log("Subiendo imagen...");
+
+  const url = await subirFoto(file);
+
+  console.log("Imagen subida:", url);
+
+  const ot = getOT(otId);
+  if (!ot) return;
+
+  const item = ot.itemsAprobados[itemIdx];
+  if (!item) return;
+
+  item.filas = item.filas || [];
+  item.filas[filaIdx] = item.filas[filaIdx] || {};
+
+  item.filas[filaIdx].refImg = url;
+
+  save();
+  panelItemsAprobados(otId);
+};
 
 function loadRefImg(evt,otId,itemIdx){
   const file=evt.target.files?.[0];if(!file)return;
@@ -7203,7 +7216,7 @@ function upGarFila(otId,itemIdx,filaIdx,field,val){
   item.filas[filaIdx]=item.filas[filaIdx]||{};
   item.filas[filaIdx][field]=val;save();
 }
-async function loadRefImgGar(evt, otId, itemIdx) {
+window.loadRefImgGar = async function(evt, otId, itemIdx) {
   const file = evt.target.files?.[0];
   if (!file) return;
 
