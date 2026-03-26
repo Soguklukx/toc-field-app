@@ -7219,5 +7219,42 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
 }
 </script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+// Tu configuración
+const firebaseConfig = {
+  apiKey: "AIzaSyCzgyshs_VEvto8-xgVyyYVnSkoeTYKlXk",
+  authDomain: "toc-field-app-c2695.firebaseapp.com",
+  projectId: "toc-field-app-c2695",
+  storageBucket: "toc-field-app-c2695.firebasestorage.app",
+  messagingSenderId: "344071269176",
+  appId: "1:344071269176:web:c86fd1da013e4755d7afcd",
+  measurementId: "G-PLSSV91JVP"
+};
+
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// 🔥 FUNCIÓN PARA SUBIR FOTO
+window.subirFoto = async function(file) {
+  const nombre = Date.now() + "_" + file.name;
+  const referencia = ref(storage, "fotos/" + nombre);
+
+  await uploadBytes(referencia, file);
+  const url = await getDownloadURL(referencia);
+
+  return url;
+};
+
+// 🔥 FUNCIÓN PARA GUARDAR DATOS
+window.guardarDato = async function(data) {
+  await addDoc(collection(db, "reportes"), data);
+};
+</script>
 </body>
 </html>
