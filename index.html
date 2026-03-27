@@ -4183,6 +4183,8 @@ function panelItemsAprobados(otId){
               ${fIdx>0?`<button class="btn bd sm" onclick="delFilaItem('${otId}',${i},${fIdx})">🗑</button>`:''}
             </div>
             <div class="fg"><label>Imagen de referencia de esta fila</label>
+              <input type="file" accept="image/*" onchange="loadRefImgFila(event,'${otId}',${i},${fIdx})">
+              console.log("FILA 🔥");
               ${f.refImg?`<img src="${f.refImg}" style="max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;cursor:pointer" onclick="lbxOpenImg('${f.refImg}','Ref fila ${fIdx+1}')">`:''}
             </div>
             <div class="fr3">
@@ -4262,6 +4264,9 @@ function upFilaItem(otId,itemIdx,filaIdx,field,val){
   item.filas[filaIdx]=item.filas[filaIdx]||{};
   item.filas[filaIdx][field]=val;save();
 }
+
+window.loadRefImgFila = async function(evt, otId, itemIdx, filaIdx) {
+  console.log("FILA 🔥");
 
   const file = evt.target.files?.[0];
   if (!file) return;
@@ -5786,6 +5791,7 @@ function rS8(L){
     +'<select style="width:auto;margin-left:8px" onchange="s3k(\'concertina\',\'reqRep\',this.value);rp(3)"'+(L?' disabled':'')+'>'
     +'<option value="no"'+((d.reqRep||'no')==='no'?' selected':'')+'>No</option><option value="si"'+(d.reqRep==='si'?' selected':'')+'>Sí</option>'
     +'</select></div>'
+    +(d.reqRep==='si'?'<div class="fg"><label>Largo total a reparar(m)</label><input type="number" step="0.01" value="'+(d.largo||'')+'"'+(L?' readonly':'')+' onchange="s3k(\'concertina\',\'largo\',this.value)"></div>':'')
     +'<div class="st" style="font-size:.7rem">Evidencias Externas</div>'
     +fi('conc_ext_A','A. Cara frontal *','',false,'image/*',true,'antes',L)
     +fi('conc_ext_B','B. Cara lateral derecha','',false,'image/*',false,'antes',L)
