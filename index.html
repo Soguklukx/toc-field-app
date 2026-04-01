@@ -82,6 +82,23 @@ if('serviceWorker' in navigator){
   --sem-ok:#1DDA7A;--sem-warn:#FFB627;--sem-risk:#FF7240;--sem-venc:#FF4D5E;
   --r:10px;--sh:0 6px 28px rgba(0,0,0,.45);--t:all .18s ease;
 }
+/* ── Modo outdoor / alto contraste ── */
+body.outdoor{
+  --ink:#FFFFFF;--ink2:#E8F0F8;--ink3:#D0DCE8;--ink4:#B0C4D8;
+  --white:#000000;--g1:#0A1628;--g2:#0F2040;--g3:#1A3050;
+  --cyan:#0055AA;--cyan2:#004499;--orange:#CC4400;--gold:#AA7700;
+  --ok:#006633;--warn:#885500;--red:#CC0011;--border:rgba(0,0,0,.25);
+}
+body.outdoor input,body.outdoor select,body.outdoor textarea{background:#E8F0F8;border-color:rgba(0,0,0,.3);color:#000}
+body.outdoor input:focus,body.outdoor select:focus,body.outdoor textarea:focus{border-color:#0055AA;box-shadow:0 0 0 3px rgba(0,85,170,.18)}
+body.outdoor .card{background:#EFF4FA;border-color:rgba(0,0,0,.18)}
+body.outdoor .navbar{background:#D0DCE8;border-bottom-color:rgba(0,85,170,.4)}
+body.outdoor .st{color:#0055AA;border-bottom-color:rgba(0,85,170,.25)}
+body.outdoor .btn{background:#0055AA;color:#fff}
+body.outdoor .btn.bd{background:transparent;border-color:#0055AA;color:#0055AA}
+body.outdoor select option{background:#E8F0F8;color:#000}
+#btnOutdoor{transition:var(--t)}
+body.outdoor #btnOutdoor{background:rgba(0,85,170,.15);border-radius:6px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-tap-highlight-color:transparent}
 body{font-family:'Syne',sans-serif;background:var(--ink);color:var(--white);min-height:100vh;overflow-x:hidden}
@@ -670,12 +687,11 @@ async function wmAdd(src, meta){
 }
 
 async function wmVid(src, meta){
-  // Mobile-compatible video thumbnail + watermark
-  // Uses play/timeupdate instead of seek (which blocks on mobile)
+  // Mobile-compatible video thumbnail + watermark — uses max native resolution
   return new Promise(res=>{
     const v=document.createElement('video');
     v.muted=true; v.playsInline=true; v.preload='auto';
-    v.style.cssText='position:absolute;left:-9999px;width:1px;height:1px;opacity:0';
+    v.style.cssText='position:absolute;left:-9999px;width:320px;height:240px;opacity:0';
     document.body.appendChild(v);
     let captured=false;
 
@@ -686,27 +702,29 @@ async function wmVid(src, meta){
       try{ v.pause(); }catch(e){}
       try{
         const c=document.getElementById('wmc');
-        const w=Math.max(v.videoWidth||0,640), h=Math.max(v.videoHeight||0,360);
+        // Use natural video resolution (fallback to 1280x720 for quality)
+        const w=Math.max(v.videoWidth||0,1280), h=Math.max(v.videoHeight||0,720);
         c.width=w; c.height=h;
         const ctx=c.getContext('2d');
         ctx.drawImage(v,0,0,w,h);
-        // Play button overlay
+        // Play button overlay circle
+        const r=Math.min(w,h)*0.1;
         ctx.fillStyle='rgba(0,0,0,.55)';
-        ctx.beginPath(); ctx.arc(w/2,h/2,Math.min(w,h)*0.13,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(w/2,h/2,r,0,Math.PI*2); ctx.fill();
         ctx.fillStyle='#fff';
-        ctx.font='bold '+Math.round(Math.min(w,h)*0.1)+'px sans-serif';
+        ctx.font='bold '+Math.round(r*1.1)+'px sans-serif';
         ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText('\u25B6',w/2+2,h/2);
+        ctx.fillText('\u25B6',w/2+r*0.08,h/2);
         cleanup();
-        res(await wmAdd(c.toDataURL('image/jpeg',.82),meta));
-      }catch(e){ cleanup(); res(src); }
+        res(await wmAdd(c.toDataURL('image/jpeg',.88),meta));
+      }catch(e){ cleanup(); res(null); }
     };
 
     v.addEventListener('timeupdate',doCapture,{once:true});
     v.addEventListener('seeked',doCapture,{once:true});
-    v.addEventListener('canplay',()=>{ v.play().catch(()=>{ v.currentTime=0; }); },{once:true});
-    v.addEventListener('error',()=>{ cleanup(); res(src); },{once:true});
-    setTimeout(()=>{ if(!captured){ doCapture(); } }, 5000);
+    v.addEventListener('canplay',()=>{ v.play().catch(()=>{ v.currentTime=0.5; }); },{once:true});
+    v.addEventListener('error',()=>{ cleanup(); res(null); },{once:true});
+    setTimeout(()=>{ if(!captured){ doCapture(); } }, 6000);
 
     v.src=src; v.load();
   });
@@ -743,8 +761,13 @@ let _lbxSec='', _lbxOtId='', _lbxIdx=0;
 async function hFI(inp, sec, phase='antes'){
   const ot=curOT(); if(!ot)return;
   const files=Array.from(inp.files); const meta=wmMeta();
-  for(const f of files){
+  if(files.length>3) showToast(`⏳ Procesando ${files.length} archivos…`,'info');
+  for(let fi_i=0;fi_i<files.length;fi_i++){
+    const f=files[fi_i];
+    if(files.length>5) showToast(`📷 ${fi_i+1}/${files.length} procesando…`,'info');
     const fd=await procFile(f,meta); fd.phase=phase;
+    // Si wmVid devolvió null, usar original como fallback
+    if(fd.watermarked===null) fd.watermarked=null;
     // Subir imagen watermarked a Firebase Storage para sincronizar entre dispositivos
     if(window.subirBase64 && fd.watermarked && !f.type.startsWith('video/')){
       try{
@@ -770,6 +793,7 @@ async function hFI(inp, sec, phase='antes'){
       updateNotifBadge();
     }
   }
+  if(files.length>1) showToast(`✅ ${files.length} archivos cargados`,'ok');
   save();
   rp(STATE.tab);
 }
@@ -785,17 +809,27 @@ function prevs(sec, phase='antes'){
   const ot=curOT(); if(!ot)return'';
   const its=getEvid(ot.id,sec); if(!its.length)return'';
   const otId=ot.id;
-  return`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(85px,1fr));gap:7px;margin-top:7px">${its.map((f,i)=>{
+  const MAX_SHOW=5;
+  const visible=its.slice(0,MAX_SHOW);
+  const extra=its.length-MAX_SHOW;
+  const items=visible.map((f,i)=>{
     const isVideo=f.type&&f.type.startsWith('video/');
+    const thumbSrc=f.watermarked&&!f.watermarked.startsWith('data:video')?f.watermarked:(f.url||'');
     const thumb=isVideo
-      ? `<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;font-size:2rem">▶️</div>`
-      : `<img src="${f.url||f.watermarked}" alt="${f.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
+      ? (thumbSrc
+          ? `<div style="position:relative;width:100%;height:100%"><img src="${thumbSrc}" alt="${f.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div style="display:none;position:absolute;inset:0;background:#000;align-items:center;justify-content:center;font-size:1.8rem">▶</div></div>`
+          : `<div style="width:100%;height:100%;background:#111;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#fff">▶</div>`)
+      : `<img src="${f.url||f.watermarked}" alt="${f.name}" onerror="if(this.dataset.fb)return;this.dataset.fb='1';this.src='${(f.watermarked||f.url||'').replace(/'/g,'%27')}'" style="width:100%;height:100%;object-fit:cover">`;
     return`<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${otId}','${sec}',${i})">
       ${thumb}
       <button onclick="event.stopPropagation();delEvidUI('${sec}',${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.7rem;z-index:2">✕</button>
       <span style="position:absolute;bottom:3px;left:3px;background:rgba(0,0,0,.72);color:#fff;font-size:.48rem;padding:1px 4px;border-radius:3px;max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
+  const moreBtn=extra>0
+    ? `<div onclick="lbxOpen('${otId}','${sec}',${MAX_SHOW})" style="border-radius:8px;aspect-ratio:1;background:var(--ink3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;border:2px dashed rgba(0,229,195,.3)"><span style="font-size:1.1rem;font-weight:800;color:var(--cyan)">+${extra}</span><span style="font-size:.58rem;color:var(--g3)">más fotos</span></div>`
+    : '';
+  return`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(85px,1fr));gap:7px;margin-top:7px">${items}${moreBtn}</div>`;
 }
 
 function delEvidUI(sec,i){
@@ -2576,6 +2610,7 @@ function _showSplash(msg){
 function _splashPct(p){const b=document.getElementById('splashBar');if(b)b.style.width=p+'%';}
 
 document.addEventListener('DOMContentLoaded',async()=>{
+  try{if(localStorage.getItem('toc_outdoor')==='1')document.body.classList.add('outdoor');}catch(e){}
   _showSplash('Cargando datos locales…');
   _splashPct(15);
 
@@ -3446,7 +3481,14 @@ function panelNotifs(){
   save();
   updateNotifBadge();
 
-  const actividades=notifs.filter(n=>['actividad','h3_completado','h4_completado','h5_completado','garantia_activada'].includes(n.tipo));
+  const actividades=notifs.filter(n=>{
+    if(!['actividad','h3_completado','h4_completado','h5_completado','garantia_activada'].includes(n.tipo)) return false;
+    // Solo mostrar OTs que están pendientes de acción (no finalizadas/cargadas/subsanadas/canceladas)
+    const ot=n.otId?getOT(n.otId):null;
+    if(!ot) return true;
+    return !['finalizada','cargada','subsanada','cancelada'].includes(ot.estado||'');
+  });
+  // Alertas de semáforo: mostrar SIEMPRE (no se filtran por estado para que persistan)
   const alertas=notifs.filter(n=>n.tipo==='alerta');
 
   let html=`
@@ -3895,7 +3937,7 @@ function _verOTRender(otId){
               const isVid=(ev.data+'').startsWith('data:video');
               return `<div style="position:relative;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${ot.id}','${ev.field.replace(/'/g,'')}',0)">
                 ${isVid?`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;background:#000">▶️</div>`:
-                `<img src="${ev.data}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`}
+                `<img src="${ev.data}" style="width:100%;height:100%;object-fit:cover">`}
               </div>`;
             }).join('')}
             ${evAnt.length>24?`<div style="aspect-ratio:1;border-radius:6px;background:var(--ink3);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--g3);font-weight:700">+${evAnt.length-24}</div>`:''}
@@ -3956,7 +3998,7 @@ function _verOTRender(otId){
               const isVid=(ev.data+'').startsWith('data:video');
               return `<div style="position:relative;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${ot.id}','${ev.field.replace(/'/g,'')}',0)">
                 ${isVid?`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;background:#000">▶️</div>`:
-                `<img src="${ev.data}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`}
+                `<img src="${ev.data}" style="width:100%;height:100%;object-fit:cover">`}
               </div>`;
             }).join('')}
             ${evDp.length>20?`<div style="aspect-ratio:1;border-radius:6px;background:var(--ink3);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--g3);font-weight:700">+${evDp.length-20}</div>`:''}
@@ -5591,6 +5633,7 @@ function renderMain(html){
       <button class="nav-logo" onclick="routeByRole()">⚡ TOC MTTO</button>
       <div style="display:flex;gap:8px;align-items:center">
         <button id="syncDot" onclick="syncFromCloud()" title="Sincronizar con la nube" style="background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--g3);padding:4px 6px;border-radius:6px">☁️</button>
+        <button id="btnOutdoor" onclick="toggleOutdoor()" title="Modo outdoor / alto contraste" style="background:none;border:none;cursor:pointer;font-size:.8rem;padding:4px 6px;border-radius:6px">☀️</button>
         ${isNotifRole?`<button class="btn-notif" onclick="panelNotifs()" title="Notificaciones">
           🔔<span id="notifBadge" class="notif-badge" style="display:${notifCount>0?'flex':'none'}">${notifCount||''}</span>
         </button>`:''}
@@ -6033,7 +6076,7 @@ function rS8(L){
     +(d.reqRep==='si'?'<div class="st" style="font-size:.7rem">Tramos a Reparar</div>'
       +(d.reparaciones||[]).map(function(r,i){return rRepEntry('concertina',r,i,L);}).join('')
       +(!L?'<button class="btn sm bd" onclick="addRep(\'concertina\')">+ Tramo</button>':'')
-      :fi('conc_no_rep_foto','Foto evidencia sin reparación *','',false,'image/*',true,'antes',L))
+      :'')
     +'</div>';}
 
 /* ─── rS9: Reflectores ─── */
@@ -6047,7 +6090,7 @@ function rS9(L){
 function rReflE(r,i,L){
   return '<div class="dyn">'
     +'<div class="dyn-header"><span class="t-sm">Reflector '+(i+1)+'</span>'+(i>0&&!L?'<button class="btn bd sm" onclick="delRefl('+r.id+')">🗑</button>':'')+'</div>'
-    +'<div class="fg"><label>Descripción</label><input type="text" value="'+escHtml(r.desc||'')+'" onchange="upRefl('+r.id+',\'desc\',this.value)"'+(L?' readonly':'')+' placeholder="Tipo, wattaje, estado..."></div>'
+    +'<div class="fg"><label>Descripción</label><input type="text" value="'+escHtml(r.desc||'')+'" oninput="upRefl('+r.id+',\'desc\',this.value)"'+(L?' readonly':'')+' placeholder="Tipo, wattaje, estado..."></div>'
     +fi('refl_'+r.id+'_foto','Foto del reflector *','',false,'image/*',true,'antes',L)
     +fi('refl_'+r.id+'_func','Video funcionamiento reflector '+(i+1)+' *','',false,'video/*',true,'antes',L)
     +'</div>';}
@@ -6075,6 +6118,7 @@ function rS10(L){
       const nV=parseInt(h[k+'_nventanas']||0);
       const nR=parseInt(h[k+'_nrejillas']||0);
       const nLI=parseInt(h[k+'_nlum_int']||0);
+      const nLE=parseInt(h[k+'_nlum_ext']||0);
       const nInt=parseInt(h[k+'_ninterr']||0);
       const nTm=parseInt(h[k+'_ntoma']||0);
       const spP='sp_'+k+'_p_'+Math.random().toString(36).substr(2,4);
@@ -6212,16 +6256,15 @@ function rS10(L){
 
         /* ── ELÉCTRICO ── */
         +'<div class="st" style="font-size:.7rem;margin-top:10px">⚡ Eléctrico / Cubierta</div>'
-        +'<div class="fg" style="display:flex;align-items:center;gap:8px"><label style="margin-bottom:0">Luminarias internas</label>'
-        +'<input type="number" min="0" value="'+nLI+'"'+(L?' readonly':'')+' style="width:60px" onchange="s3f(\''+k+'_nlum_int\',this.value);rp(3)"></div>'
-        +(nLI===0?fi(k+'_lumi_no','Foto evidencia (sin luminarias) *','',false,'image/*',true,'antes',L):'')
-
+        +_spin('Luminarias internas',k+'_nlum_int',null,nLI,L,0)
+        +(nLI===0?fi(k+'_lumi_no','Foto evidencia (sin luminarias internas) *','',false,'image/*',true,'antes',L):'')
         +Array.from({length:nLI},function(_,li){return fi(k+'_lumi_'+li,'Luminaria interna '+(li+1)+' *','',false,'image/*',true,'antes',L);}).join('')
-        +'<div class="fg" style="display:flex;align-items:center;gap:8px"><label style="margin-bottom:0">Interruptores</label>'
-        +'<input type="number" min="0" value="'+nInt+'"'+(L?' readonly':'')+' style="width:60px" onchange="s3f(\''+k+'_ninterr\',this.value);rp(3)"></div>'
+        +_spin('Luminarias externas',k+'_nlum_ext',null,nLE,L,0)
+        +(nLE===0?fi(k+'_lumi_ext_no','Foto evidencia (sin luminarias externas) *','',false,'image/*',true,'antes',L):'')
+        +Array.from({length:nLE},function(_,le){return fi(k+'_lumi_ext_'+le,'Luminaria externa '+(le+1)+' *','',false,'image/*',true,'antes',L);}).join('')
+        +_spin('Interruptores',k+'_ninterr',null,nInt,L,0)
         +Array.from({length:nInt},function(_,ii){return fi(k+'_int_'+ii,'Interruptor '+(ii+1)+' *','',false,'image/*',true,'antes',L);}).join('')
-        +'<div class="fg" style="display:flex;align-items:center;gap:8px"><label style="margin-bottom:0">Tomacorrientes</label>'
-        +'<input type="number" min="0" value="'+nTm+'"'+(L?' readonly':'')+' style="width:60px" onchange="s3f(\''+k+'_ntoma\',this.value);rp(3)"></div>'
+        +_spin('Tomacorrientes',k+'_ntoma',null,nTm,L,0)
         +Array.from({length:nTm},function(_,ti){return fi(k+'_toma_'+ti,'Tomacorriente '+(ti+1)+' *','',false,'image/*',true,'antes',L);}).join('')
         +fi(k+'_cub_int','Foto interna de la cubierta *','',false,'image/*',true,'antes',L)
         +fi(k+'_cub_ext','Foto superior de la cubierta *','',false,'image/*',true,'antes',L)
@@ -6238,10 +6281,13 @@ function rS11(L){
     +'<option value="no"'+((h.shelter_hay||'no')==='no'?' selected':'')+'>No</option>'
     +'<option value="si"'+(h.shelter_hay==='si'?' selected':'')+'>Sí</option></select></div>'
     +(h.shelter_hay==='si'?
-      '<div class="fg" style="display:flex;align-items:center;gap:10px"><label style="margin-bottom:0">Cantidad de shelters</label>'
-      +'<input type="number" min="0" value="'+nS+'"'+(L?' readonly':'')+' style="width:70px" onchange="s3f(\'shelter_count\',this.value);rp(3)"></div>'
+      +_spin('Cantidad de shelters','shelter_count',null,nS,L,0)
       +Array.from({length:nS},function(_,i){
-        const k='shl_'+i;const nLI=parseInt(h[k+'_nlum_int']||0);
+        const k='shl_'+i;
+        const nLI=parseInt(h[k+'_nlum_int']||0);
+        const nLE=parseInt(h[k+'_nlum_ext']||0);
+        const nInt=parseInt(h[k+'_ninterr']||0);
+        const nTm=parseInt(h[k+'_ntoma']||0);
         return '<div class="dyn" style="border-color:rgba(0,229,195,.2);margin-bottom:12px">'
           +'<div class="dyn-header"><span class="t-sm" style="color:var(--cyan)">Shelter '+(i+1)+'</span></div>'
           +'<div class="fg"><label>Estado</label><textarea'+(L?' readonly':'')+' onchange="s3f(\''+k+'_desc\',this.value)">'+escHtml(h[k+'_desc']||'')+'</textarea></div>'
@@ -6261,10 +6307,10 @@ function rS11(L){
           +fi(k+'_int_D','D. Cara lateral izquierda','',false,'image/*',false,'antes',L)
           +fi(k+'_int_vid','E. Video 360°','',false,'video/*',false,'antes',L)
           +'<div class="st" style="font-size:.7rem">Puerta del Shelter</div>'
-          +fi(k+'_puerta_foto','Foto puerta por dentro *','',false,'image/*',true,'antes',L)
-          +fi(k+'_puerta_ffuera','Foto puerta por fuera *','',false,'image/*',true,'antes',L)
           +'<div class="fr" style="margin-bottom:8px"><div class="fg"><label>Largo puerta(m)</label><input type="number" step="0.01" value="'+(h[k+'_puerta_largo']||'')+'"'+(L?' readonly':'')+' style="min-width:0" onchange="s3f(\''+k+'_puerta_largo\',this.value)"></div>'
           +'<div class="fg"><label>Ancho puerta(m)</label><input type="number" step="0.01" value="'+(h[k+'_puerta_ancho']||'')+'"'+(L?' readonly':'')+' style="min-width:0" onchange="s3f(\''+k+'_puerta_ancho\',this.value)"></div></div>'
+          +fi(k+'_puerta_foto','Foto puerta por dentro *','',false,'image/*',true,'antes',L)
+          +fi(k+'_puerta_ffuera','Foto puerta por fuera *','',false,'image/*',true,'antes',L)
           +fi(k+'_puerta_cerr','Foto cerradura','',false,'image/*',false,'antes',L)
           +fi(k+'_puerta_vid','Video funcionamiento (cerradura y apertura)','',false,'video/*',false,'antes',L)
           +'<div class="st" style="font-size:.7rem">Piso del Shelter</div>'
@@ -6273,9 +6319,14 @@ function rS11(L){
           +'<div class="fg"><label>Ancho(m)</label><input type="number" step="0.01" value="'+(h[k+'_piso_ancho']||'')+'"'+(L?' readonly':'')+' onchange="s3f(\''+k+'_piso_ancho\',this.value)"></div></div>'
           +fi(k+'_piso_foto','Foto estado del piso *','',true,'image/*',true,'antes',L)
           +'<div class="st" style="font-size:.7rem">Luminarias / Eléctrico</div>'
-          +'<div class="fg" style="display:flex;align-items:center;gap:8px"><label style="margin-bottom:0">Luminarias internas</label>'
-          +'<input type="number" min="0" value="'+nLI+'"'+(L?' readonly':'')+' style="width:60px" onchange="s3f(\''+k+'_nlum_int\',this.value);rp(3)"></div>'
-          +Array.from({length:nLI},function(_,li){return fi(k+'_lumi_'+li,'Luminaria '+(li+1)+' *','',false,'image/*',true,'antes',L);}).join('')
+          +_spin('Luminarias internas',k+'_nlum_int',null,nLI,L,0)
+          +Array.from({length:nLI},function(_,li){return fi(k+'_lumi_'+li,'Luminaria interna '+(li+1)+' *','',false,'image/*',true,'antes',L);}).join('')
+          +_spin('Luminarias externas',k+'_nlum_ext',null,nLE,L,0)
+          +Array.from({length:nLE},function(_,le){return fi(k+'_lumi_ext_'+le,'Luminaria externa '+(le+1)+' *','',false,'image/*',true,'antes',L);}).join('')
+          +_spin('Interruptores',k+'_ninterr',null,nInt,L,0)
+          +Array.from({length:nInt},function(_,ii){return fi(k+'_int_'+ii,'Interruptor '+(ii+1)+' *','',false,'image/*',true,'antes',L);}).join('')
+          +_spin('Tomacorrientes',k+'_ntoma',null,nTm,L,0)
+          +Array.from({length:nTm},function(_,ti){return fi(k+'_toma_'+ti,'Tomacorriente '+(ti+1)+' *','',false,'image/*',true,'antes',L);}).join('')
           +'<div class="st" style="font-size:.7rem">Cubierta del Shelter</div>'
           +'<div class="fg"><label>Estado cubierta (filtraciones)</label><textarea'+(L?' readonly':'')+' onchange="s3f(\''+k+'_cub_desc\',this.value)">'+escHtml(h[k+'_cub_desc']||'')+'</textarea></div>'
           +fi(k+'_cub_ext','Foto superior de la cubierta *','',false,'image/*',true,'antes',L)
@@ -6347,7 +6398,8 @@ function rS14(L){
     +'</div></div>'
     +'<div class="fg"><label>Descripción / Marca</label><textarea onchange="s3k(\'linea_vida\',\'desc\',this.value)"'+(L?' readonly':'')+'>'+escHtml(d.desc||'')+'</textarea></div>'
     +'<div class="fr"><div class="fg"><label>Largo(m)</label><input type="number" step="0.01" value="'+(d.largo||'')+'" onchange="s3k(\'linea_vida\',\'largo\',this.value)"'+(L?' readonly':'')+'></div>'
-    +'<div class="fg"><label>Guías (mín. 3)</label><input type="number" min="3" value="'+nG+'" onchange="s3k(\'linea_vida\',\'nGuias\',this.value);rp(3)" style="max-width:100px"'+(L?' readonly':'')+'></div></div>'
+    +_spin('Guías (mín. 3)','nGuias','linea_vida',nG,L,3)
+    +'</div>'
     +fi('lv_sI','A. Soporte inferior *','',false,'image/*',true,'antes',L)
     +fi('lv_sS','B. Soporte superior','',false,'image/*',false,'antes',L)
     +Array.from({length:nG},function(_,i){return fi('lv_guia_'+i,'C. Guía '+(i+1),'',false,'image/*',false,'antes',L);}).join('')
@@ -6393,7 +6445,6 @@ function rBalizajeItem(b,i,L){
     +fi('bz_'+b.id+'_abierta','Luz balizaje abierta','',false,'image/*',false,'antes',L)
     +fi('bz_'+b.id+'_roseta','Foto roseta','',false,'image/*',false,'antes',L)
     +fi('bz_'+b.id+'_bombillo','Foto bombillo','',false,'image/*',false,'antes',L)
-    +'<div class="fg"><label>Estado</label><textarea onchange="upBaliz('+b.id+',\'estado\',this.value)"'+(L?' readonly':'')+'>'+escHtml(b.estado||'')+'</textarea></div>'
     +'</div>';}
 function addBaliz(){const ot=curOT();if(!ot)return;ot.h3=ot.h3||{};(ot.h3.balizajes=ot.h3.balizajes||[]).push({id:Date.now(),desc:'',estado:''});save();rp(3);}
 function delBaliz(id){const ot=curOT();if(!ot)return;ot.h3.balizajes=ot.h3.balizajes.filter(function(x){return x.id!==id;});save();rp(3);}
@@ -7539,12 +7590,20 @@ function _validateLevSec(ot,secNum){
     case '1':
       reqFoto('comunicacion_so','Foto SO / Novedad');
       break;
-    case '2':
-      reqField((h.transportes||[])[0]?.tipo,'Tipo de transporte');
-      reqFoto('tp_foto','Foto transporte');
+    case '2':{
+      const ts2=h.transportes||[];
+      if(ts2.length===0){
+        errors.push('Campo requerido: Tipo de transporte');
+        errors.push('Falta al menos 1 foto: Foto transporte');
+      } else {
+        const t0=ts2[0];
+        reqField(t0.desc,'Tipo de transporte');
+        reqFoto('tp_'+t0.id+'_tipo','Foto transporte');
+      }
       break;
+    }
     case '3':
-      reqFoto('ingreso_llegada','Foto llegada a sitio');
+      reqFoto('ingreso_puerta','Foto portón / puerta abierta');
       break;
     case '4':
       reqFoto('poda_ext_A','Foto vegetación cara frontal');
@@ -7640,7 +7699,12 @@ function _spin(label,key,sub,val,L,min){
     +'<button type="button" onclick="var i=document.getElementById(\''+id+'\');i.value=parseInt(i.value||0)+1;i.dispatchEvent(new Event(\'change\'))" style="background:rgba(255,255,255,.06);border:none;color:var(--white);font-size:1.1rem;width:36px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>'
     +'</div></div>';
 }
-function upSpinner(sub,key,val){s3k(sub,key,val);}
+function upSpinner(sub,key,val){s3k(sub,key,val);rp(3);}
+
+function toggleOutdoor(){
+  document.body.classList.toggle('outdoor');
+  try{localStorage.setItem('toc_outdoor',document.body.classList.contains('outdoor')?'1':'0');}catch(e){}
+}
 
 
 
