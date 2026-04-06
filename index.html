@@ -475,7 +475,8 @@ input[type="checkbox"]{width:auto;accent-color:var(--cyan)}
   <button id="lbx-prev" onclick="lbxNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:1.8rem;width:44px;height:60px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:background .15s">‹</button>
   <!-- Next arrow -->
   <button id="lbx-next" onclick="lbxNav(1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:none;color:#fff;font-size:1.8rem;width:44px;height:60px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:background .15s">›</button>
-  <img id="lbx-img" src="" alt="" style="max-width:calc(100% - 120px);max-height:68vh;border-radius:8px;object-fit:contain">
+  <img id="lbx-img" src="" alt="" onerror="this.style.display='none';document.getElementById('lbx-img-fallback').style.display='flex'" style="max-width:calc(100% - 120px);max-height:68vh;border-radius:8px;object-fit:contain">
+  <div id="lbx-img-fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:220px;height:160px;background:rgba(255,255,255,.06);border-radius:12px;color:var(--g2);font-size:.8rem">📷<span>Imagen no disponible</span></div>
   <video id="lbx-vid" controls playsinline style="max-width:calc(100% - 120px);max-height:68vh;border-radius:8px;display:none;outline:none"></video>
   <div id="lbx-cap" style="color:var(--g2);font-size:.76rem;margin-top:8px;text-align:center"></div>
   <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
@@ -819,7 +820,7 @@ function prevs(sec, phase='antes'){
       ? (thumbSrc
           ? `<div style="position:relative;width:100%;height:100%"><img src="${thumbSrc}" alt="${f.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div style="display:none;position:absolute;inset:0;background:#000;align-items:center;justify-content:center;font-size:1.8rem">▶</div></div>`
           : `<div style="width:100%;height:100%;background:#111;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#fff">▶</div>`)
-      : `<img src="${f.url||f.watermarked}" alt="${f.name}" onerror="if(this.dataset.fb)return;this.dataset.fb='1';this.src='${(f.watermarked||f.url||'').replace(/'/g,'%27')}'" style="width:100%;height:100%;object-fit:cover">`;
+      : `<img src="${f.url||f.watermarked}" alt="${f.name}" onerror="if(this.dataset.fb==='2')return;if(!this.dataset.fb){this.dataset.fb='1';const fb='${(f.watermarked||f.url||'').replace(/'/g,'%27')}';if(fb&&fb!==this.src){this.src=fb;return;}}this.dataset.fb='2';this.style.display='none';this.insertAdjacentHTML('afterend',\\'<div style=\"width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:var(--ink3);color:var(--g3);font-size:.6rem\">📷<span>Sin imagen</span></div>\\')" style="width:100%;height:100%;object-fit:cover">`;
     return`<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${otId}','${sec}',${i})">
       ${thumb}
       <button onclick="event.stopPropagation();delEvidUI('${sec}',${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.7rem;z-index:2">✕</button>
@@ -889,6 +890,7 @@ function lbxOpen(otId,sec,idx){
   } else {
     if(vidEl){vidEl.pause&&vidEl.pause();vidEl.style.display='none';vidEl.src='';}
     imgEl.style.display='block';imgEl.src=src;
+    const fb=document.getElementById('lbx-img-fallback');if(fb)fb.style.display='none';
   }
   document.getElementById('lbx-cap').textContent=cap;
   const dl=document.getElementById('lbx-dl');
@@ -951,7 +953,7 @@ function fi(sec,label,tip='',multi=false,accept='image/*,video/*',required=false
   if(!locked){
     const isImgOnly=accept==='image/*';
     const isVidOnly=accept==='video/*';
-    const captureAttr=isImgOnly?'capture="environment"':isVidOnly?'capture="camcorder"':'';
+    const captureAttr=isImgOnly?'capture="environment"':isVidOnly?'capture="environment"':'';
     fileEl=`<input type="file" accept="${accept}" ${multi?'multiple':''} ${captureAttr} data-sec="${sec}" data-phase="${phase}" style="margin-top:4px">`;
   }
   return`<div class="fg">
@@ -1067,7 +1069,6 @@ function toggleItemH4(otId, idx, done){
       const nFotos=getEvid(otId,'h4_ev_'+idx+'_'+fi).length;
       if(!nFotos) errors.push(`Fila ${fi+1}: falta al menos 1 foto de evidencia.`);
     });
-    if(!ot.h4?.obsCierre||!ot.h4.obsCierre.trim()) errors.push('Faltan observaciones de cierre.');
     if(errors.length){
       openModal(`<div style="text-align:center;padding:8px">
         <div style="font-size:2rem;margin-bottom:8px">⚠️</div>
@@ -1561,9 +1562,9 @@ function getAllEvidencias(ot){
       const field=k.slice(ot.id.length+2);
       const items=ev[k];
       if(Array.isArray(items)){
-        items.forEach(f=>all.push({key:k,field,phase:f.phase||'antes',data:f.watermarked||f.original}));
+        items.forEach(f=>all.push({key:k,field,phase:f.phase||'antes',data:f.watermarked||f.original,url:f.url||''}));
       } else if(items){
-        all.push({key:k,field,phase:'antes',data:items.watermarked||items});
+        all.push({key:k,field,phase:'antes',data:items.watermarked||items,url:''});
       }
     }
   });
@@ -1683,7 +1684,7 @@ async function genPDF(otId){
     }
 
     // Fotos (evidencias antes)
-    const evs=getAllEvidencias(ot).filter(e=>e.phase==='antes'&&e.data);
+    const evs=getAllEvidencias(ot).filter(e=>e.phase==='antes'&&(e.data||e.url));
     if(evs.length){
       doc.addPage();y=M;
       doc.setFont('helvetica','bold');doc.setFontSize(12);
@@ -1694,9 +1695,18 @@ async function genPDF(otId){
           const iw=85,ih=60;
           const x=col===0?M:M+iw+5;
           if(y+ih>280){doc.addPage();y=M;col=0;}
-          // Detectar formato de imagen
-          const fmt=ev.data.includes('data:image/png')?'PNG':'JPEG';
-          doc.addImage(ev.data,fmt,x,y,iw,ih);
+          let imgData=ev.data;
+          if(!imgData&&ev.url){
+            try{
+              const r=await fetch(ev.url);
+              const blob=await r.blob();
+              imgData=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(blob);});
+            }catch(fe){imgData=null;}
+          }
+          if(imgData){
+            const fmt=imgData.includes('data:image/png')?'PNG':'JPEG';
+            doc.addImage(imgData,fmt,x,y,iw,ih);
+          }
           doc.setFontSize(7);doc.setFont('helvetica','normal');
           pdfText(ev.field.replace(/_/g,' ').substring(0,30),x,y+ih+3);
           col++;
@@ -1792,18 +1802,35 @@ async function genZIPAntes(otId){
   try{
     const zip=new JSZip();
     const folder=zip.folder(`ANTES_${ot.numero}_${ot.estacion}`);
-    const evs=getAllEvidencias(ot).filter(e=>e.phase==='antes'&&e.data);
-    evs.forEach((ev,i)=>{
-      const base64=ev.data.split(',')[1];
-      const ext=ev.data.includes('png')?'png':'jpg';
-      folder.file(`${String(i+1).padStart(3,'0')}_${ev.field}.${ext}`,base64,{base64:true});
-    });
+    const evs=getAllEvidencias(ot).filter(e=>e.phase==='antes'&&(e.data||e.url));
+    let added=0;
+    for(let i=0;i<evs.length;i++){
+      const ev=evs[i];
+      const fname=`${String(i+1).padStart(3,'0')}_${ev.field}`;
+      if(ev.data&&ev.data.startsWith('data:')){
+        const base64=ev.data.split(',')[1];
+        const ext=ev.data.includes('png')?'png':'jpg';
+        folder.file(`${fname}.${ext}`,base64,{base64:true});
+        added++;
+      } else if(ev.url){
+        try{
+          const resp=await fetch(ev.url);
+          if(resp.ok){
+            const blob=await resp.blob();
+            const ext=blob.type.includes('png')?'png':'jpg';
+            folder.file(`${fname}.${ext}`,blob);
+            added++;
+          }
+        }catch(fe){console.warn('No se pudo descargar foto:',fe);}
+      }
+    }
+    if(added===0){showToast('⚠️ No hay fotos ANTES para exportar','warn');return;}
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     a.download=`ANTES_${ot.numero}_${ot.estacion}.zip`;
     a.click();
-    showToast('✅ ZIP descargado','ok');
+    showToast(`✅ ZIP descargado (${added} fotos)`,'ok');
   }catch(e){console.error(e);showToast('❌ Error ZIP: '+e.message,'danger');}
 }
 
@@ -1896,7 +1923,7 @@ async function genGarantiaPDF(otId){
 }
 
 /* ── Word (Blob HTML) ── */
-function genWord(otId){
+async function genWord(otId){
   const ot=getOT(otId||STATE.currentOT);if(!ot)return;
   showToast('📝 Generando Word...','info');
   const sum=getSummary(ot);
@@ -1912,6 +1939,34 @@ function genWord(otId){
     </table>`;
   }).join('');
   const sumHtml=sum.map(({sec,val})=>`<tr><td><b>${sec}</b></td><td>${val}</td></tr>`).join('');
+
+  // Cargar fotos
+  const evs=getAllEvidencias(ot).filter(e=>e.phase==='antes'&&(e.data||e.url));
+  let fotosHtml='';
+  if(evs.length){
+    fotosHtml='<h2>REGISTRO FOTOGRÁFICO</h2><table cellpadding="6" style="width:100%">';
+    let col=0;
+    for(const ev of evs){
+      let imgData=ev.data;
+      if(!imgData&&ev.url){
+        try{
+          const r=await fetch(ev.url);
+          const blob=await r.blob();
+          imgData=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(blob);});
+        }catch(fe){imgData=null;}
+      }
+      if(col===0) fotosHtml+='<tr>';
+      fotosHtml+=`<td style="width:50%;text-align:center;vertical-align:top">
+        ${imgData?`<img src="${imgData}" style="max-width:280px;max-height:200px;border-radius:4px">`:`<div style="color:#999;font-size:9pt">[foto no disponible]</div>`}
+        <div style="font-size:8pt;color:#666;margin-top:4px">${ev.field.replace(/_/g,' ')}</div>
+      </td>`;
+      col++;
+      if(col===2){fotosHtml+='</tr>';col=0;}
+    }
+    if(col===1) fotosHtml+='<td></td></tr>';
+    fotosHtml+='</table>';
+  }
+
   const html=`<html><head><meta charset="UTF-8">
     <style>body{font-family:Arial,sans-serif;font-size:10pt}h1{font-size:14pt}h2{font-size:12pt}h3{font-size:11pt}table{font-size:9pt}td,th{padding:4px}</style>
     </head><body>
@@ -1927,6 +1982,7 @@ function genWord(otId){
     <table border="1" cellpadding="4" style="border-collapse:collapse;width:100%">${sumHtml}</table>
     <h2>ÍTEMS APROBADOS</h2>${items}
     ${ot.h4?.obsCierre?`<h2>OBSERVACIONES DE CIERRE</h2><p>${ot.h4.obsCierre}</p>`:''}
+    ${fotosHtml}
     </body></html>`;
   const blob=new Blob([html],{type:'application/msword'});
   const a=document.createElement('a');
@@ -3744,22 +3800,12 @@ function _notifDrillOT(otId){
         <div class="t-sm" style="font-weight:700;color:var(--cyan);margin-bottom:8px">🔗 Acceso directo</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" onclick="STATE.prevView='notifs';iH3('${otId}')">③ Ver Levantamiento →</button>
-          ${hasItems&&h4Done?`<button class="btn bd sm" onclick="STATE.prevView='notifs';iH4('${otId}')">④ Ver Actividades</button>`:''}
           <button class="btn bd sm" onclick="verOT('${otId}')">📋 Ver OT completa</button>
         </div>
       </div>`;
   }
 
   html+=accesoHTML;
-
-  // ── Sección EPP ──
-  if(ot.eppCompletado||ot.h4Saved){
-    html+=`<div class="card" style="border-color:rgba(255,114,64,.2);background:rgba(255,114,64,.04)">
-      <div class="t-sm" style="font-weight:700;color:var(--orange);margin-bottom:8px">🦺 EPP</div>
-      <div class="badge bok" style="margin-bottom:8px">✅ EPPs verificados</div>
-      <button class="btn sm bd" onclick="STATE.prevView='notifs';iH_EPP('${otId}')">🦺 Ver Hoja EPP →</button>
-    </div>`;
-  }
 
   // ── Sección Actividades ──
   const itemsN=ot.itemsAprobados||[];
@@ -3777,6 +3823,15 @@ function _notifDrillOT(otId){
         ${u&&u.rol!=='tabasco'&&u.rol!=='admin'?'':`<button class="btn sm bd" onclick="STATE.prevView='notifs';iH4('${otId}')">④ Ver Actividades →</button>`}
         ${ot.h4Saved?`<div class="badge bok" style="font-size:.7rem">✅ Guardadas</div>`:''}
       </div>
+    </div>`;
+  }
+
+  // ── Sección EPP ──
+  if(ot.eppCompletado||ot.h4Saved){
+    html+=`<div class="card" style="border-color:rgba(255,114,64,.2);background:rgba(255,114,64,.04)">
+      <div class="t-sm" style="font-weight:700;color:var(--orange);margin-bottom:8px">🦺 EPP</div>
+      <div class="badge bok" style="margin-bottom:8px">✅ EPPs verificados</div>
+      <button class="btn sm bd" onclick="STATE.prevView='notifs';iH_EPP('${otId}')">🦺 Ver Hoja EPP →</button>
     </div>`;
   }
 
@@ -4016,7 +4071,7 @@ function _verOTRender(otId){
             <button class="btn sm bd" onclick="genPazSalvoWord('${ot.id}')">📝 Word Paz y Salvo</button>
             <button class="btn sm bd" onclick="genExcelLiquidacion('${ot.id}')">📊 Excel Liquidación</button>
             <button class="btn sm bd" onclick="genExcelActaLlaves('${ot.id}')">🗝️ Excel Acta de Llaves</button>
-            <button class="btn sm bd" onclick="genActaLlavesPDF('${ot.id}')">📑 Acta de Llaves PDF</button>
+            <button class="btn sm bd" onclick="genPDFActaLlaves('${ot.id}')">📑 Acta de Llaves PDF</button>
             <button class="btn sm bd" onclick="genZIPDespues('${ot.id}')">⬇️ ZIP Fotos DESPUÉS (${evDespues.length})</button>
           </div>
         </div>
@@ -4443,7 +4498,6 @@ function panelItemsAprobados(otId){
             </div>
             <div class="fg"><label>Imagen de referencia de esta fila</label>
               <input type="file" accept="image/*" onchange="loadRefImgFila(event,'${otId}',${i},${fIdx})">
-              console.log("FILA 🔥");
               ${f.refImg?`<img src="${f.refImg}" style="max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;cursor:pointer" onclick="lbxOpenImg('${f.refImg}','Ref fila ${fIdx+1}')">`:''}
             </div>
             <div class="fr3">
@@ -6281,7 +6335,7 @@ function rS11(L){
     +'<option value="no"'+((h.shelter_hay||'no')==='no'?' selected':'')+'>No</option>'
     +'<option value="si"'+(h.shelter_hay==='si'?' selected':'')+'>Sí</option></select></div>'
     +(h.shelter_hay==='si'?
-      +_spin('Cantidad de shelters','shelter_count',null,nS,L,0)
+      _spin('Cantidad de shelters','shelter_count',null,nS,L,0)
       +Array.from({length:nS},function(_,i){
         const k='shl_'+i;
         const nLI=parseInt(h[k+'_nlum_int']||0);
@@ -6520,18 +6574,35 @@ async function genZIPDespues(otId){
   try{
     const zip=new JSZip();
     const folder=zip.folder(`DESPUES_${ot.numero}_${ot.estacion}`);
-    const evs=getAllEvidencias(ot).filter(e=>e.phase==='despues'&&e.data);
-    evs.forEach((ev,i)=>{
-      const base64=ev.data.split(',')[1];
-      const ext=ev.data.includes('png')?'png':'jpg';
-      folder.file(`${String(i+1).padStart(3,'0')}_${ev.field}.${ext}`,base64,{base64:true});
-    });
+    const evs=getAllEvidencias(ot).filter(e=>e.phase==='despues'&&(e.data||e.url));
+    let added=0;
+    for(let i=0;i<evs.length;i++){
+      const ev=evs[i];
+      const fname=`${String(i+1).padStart(3,'0')}_${ev.field}`;
+      if(ev.data&&ev.data.startsWith('data:')){
+        const base64=ev.data.split(',')[1];
+        const ext=ev.data.includes('png')?'png':'jpg';
+        folder.file(`${fname}.${ext}`,base64,{base64:true});
+        added++;
+      } else if(ev.url){
+        try{
+          const resp=await fetch(ev.url);
+          if(resp.ok){
+            const blob=await resp.blob();
+            const ext=blob.type.includes('png')?'png':'jpg';
+            folder.file(`${fname}.${ext}`,blob);
+            added++;
+          }
+        }catch(fe){console.warn('No se pudo descargar foto:',fe);}
+      }
+    }
+    if(added===0){showToast('⚠️ No hay fotos DESPUÉS para exportar','warn');return;}
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     a.download=`DESPUES_${ot.numero}_${ot.estacion}.zip`;
     a.click();
-    showToast('✅ ZIP DESPUÉS descargado','ok');
+    showToast(`✅ ZIP DESPUÉS descargado (${added} fotos)`,'ok');
   }catch(e){showToast('❌ Error: '+e.message,'danger');}
 }
 
