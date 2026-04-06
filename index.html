@@ -3617,7 +3617,28 @@ function panelNotifs(){
             const gD=gI.filter((_,i)=>ot.garantia.itemDone?.[i]).length;
             badges+=`<span style="font-size:.67rem;background:rgba(155,89,182,.15);color:var(--purple);border-radius:10px;padding:2px 7px;margin-right:4px">🛡️ Gar ${gI.length>0?Math.round((gD/gI.length)*100):0}%</span>`;
           }
-          return badges?`<div style="margin-bottom:6px">${badges}</div>`:'';
+          // ── Pipeline 3 etapas ──
+          const hasAct=(ot.itemsAprobados||[]).length>0;
+          const hasGar=!!ot.garantia?.activa;
+          const levOk=levPct>=100||!!ot.h3Saved;
+          const actOk=!!ot.h4Saved;
+          const garOk=hasGar&&!!ot.garantia?.h4Saved;
+          const stages=[
+            {ico:'📋',lbl:'Levantamiento',ok:levOk,active:!levOk},
+            {ico:'⚙️',lbl:'Actividades',ok:actOk,active:levOk&&hasAct&&!actOk,na:!hasAct},
+            {ico:'🛡️',lbl:'Garantía',ok:garOk,active:(actOk||!hasAct)&&hasGar&&!garOk,na:!hasGar},
+          ];
+          const pipe=stages.map((s,i)=>{
+            const col=s.ok?'var(--ok)':s.active?'var(--cyan)':s.na?'var(--g3)':'var(--gold)';
+            const bg=s.ok?'rgba(29,218,122,.13)':s.active?'rgba(0,229,195,.1)':'rgba(255,255,255,.04)';
+            const connector=i<stages.length-1?`<div style="flex:1;height:2px;background:${s.ok?'var(--ok)':'rgba(255,255,255,.1)'};margin:0 2px;align-self:center;border-radius:2px"></div>`:'';
+            return `<div style="display:flex;align-items:center;flex:1;min-width:0">`
+              +`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;padding:4px 2px;background:${bg};border-radius:7px">`
+              +`<span style="font-size:.85rem">${s.ok?'✅':s.ico}</span>`
+              +`<span style="font-size:.5rem;color:${col};font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${s.lbl}</span>`
+              +`</div>${connector}</div>`;
+          }).join('');
+          return (badges?`<div style="margin-bottom:6px">${badges}</div>`:'')+`<div style="display:flex;align-items:stretch;gap:3px;margin-bottom:6px">${pipe}</div>`;
         })()}`:''}
         <div class="t-sm" style="color:var(--g2);font-size:.78rem">${lastN.msg}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
@@ -5277,13 +5298,22 @@ function _wrapSec(num, html, L){
   const ot=curOT();
   const secKey='lev_done_'+num;
   const done=ot&&ot.h3&&ot.h3[secKey];
+
+  // Extraer título del .st para usarlo en el summary colapsable
+  const stMatch=html.match(/<div class="st">([\s\S]*?)<\/div>/);
+  const titleHTML=stMatch?stMatch[1]:`Sección ${num}`;
+  const bodyHTML=stMatch?html.replace(/<div class="st">[\s\S]*?<\/div>/,''):html;
+
   if(L){
-    // En modo locked: mostrar indicador visual de completado pero sin botones
-    return '<div style="position:relative;margin-bottom:4px">'
-      +(done?'<div style="position:absolute;top:10px;right:10px;z-index:1;background:rgba(29,218,122,.18);color:var(--ok);border-radius:20px;padding:2px 10px;font-size:.68rem;font-weight:700">✅ Completado</div>':'')
-      +html+'</div>';
+    return `<details${done?'':' open'} style="margin-bottom:4px;border-radius:12px;overflow:hidden">`
+      +`<summary style="list-style:none;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--ink3);cursor:pointer;user-select:none;border-radius:12px">`
+      +`<span class="st" style="margin:0;border:none;padding:0;font-size:.78rem">${titleHTML}</span>`
+      +(done?'<span style="background:rgba(29,218,122,.18);color:var(--ok);border-radius:20px;padding:2px 10px;font-size:.68rem;font-weight:700;flex-shrink:0">✅ Completado</span>':'<span style="color:var(--g3);font-size:.68rem;flex-shrink:0">⏳ Pendiente</span>')
+      +`</summary>`
+      +`<div style="padding:0 2px 2px">${bodyHTML}</div></details>`;
   }
-  const wStyle=done?'outline:2px solid rgba(29,218,122,.3);outline-offset:2px;border-radius:12px;margin-bottom:14px;':'margin-bottom:14px;';
+
+  const wStyle=done?'outline:2px solid rgba(29,218,122,.3);outline-offset:2px;border-radius:12px;margin-bottom:6px;':'margin-bottom:6px;';
   let btn='';
   if(done){
     btn='<div style="display:flex;gap:6px;padding:0 4px 12px">'
@@ -5295,7 +5325,13 @@ function _wrapSec(num, html, L){
       +'<button onclick="toggleLevSec(\''+secKey+'\',true)" style="background:rgba(0,229,195,.13);border:1.5px solid rgba(0,229,195,.35);color:var(--cyan);border-radius:20px;padding:5px 16px;font-size:.74rem;cursor:pointer;font-family:\'Syne\',sans-serif;font-weight:700;transition:all .15s">✅ Completar sección</button>'
       +'</div>';
   }
-  return '<div style="'+wStyle+'">'+html+btn+'</div>';
+  // Completadas → colapsadas por default; pendientes → abiertas
+  return `<details${done?'':' open'} style="${wStyle}">`
+    +`<summary style="list-style:none;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--ink3);cursor:pointer;user-select:none;border-radius:${done?'12px':'12px 12px 0 0'}">`
+    +`<span class="st" style="margin:0;border:none;padding:0;font-size:.78rem">${titleHTML}</span>`
+    +(done?'<span style="background:rgba(29,218,122,.18);color:var(--ok);border-radius:20px;padding:2px 10px;font-size:.68rem;font-weight:700;flex-shrink:0;margin-left:8px">✅</span>':'<span style="color:var(--cyan);font-size:.78rem;flex-shrink:0;margin-left:8px">▾</span>')
+    +`</summary>`
+    +`<div style="padding:0 2px 2px">${bodyHTML}${btn}</div></details>`;
 }
 
 function _renderH3(otId){
