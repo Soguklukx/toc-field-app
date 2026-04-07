@@ -97,6 +97,11 @@ body.outdoor .st{color:#0055AA;border-bottom-color:rgba(0,85,170,.25)}
 body.outdoor .btn{background:#0055AA;color:#fff}
 body.outdoor .btn.bd{background:transparent;border-color:#0055AA;color:#0055AA}
 body.outdoor select option{background:#E8F0F8;color:#000}
+/* Fix #10 – alertas en modo outdoor */
+body.outdoor .a-i{background:rgba(0,85,170,.12);border-left-color:#0055AA;color:#000}
+body.outdoor .a-w{background:rgba(170,119,0,.12);border-left-color:#AA7700;color:#000}
+body.outdoor .a-e{background:rgba(204,0,17,.12);border-left-color:#CC0011;color:#000}
+body.outdoor .a-s{background:rgba(0,102,51,.12);border-left-color:#006633;color:#000}
 #btnOutdoor{transition:var(--t)}
 body.outdoor #btnOutdoor{background:rgba(0,85,170,.15);border-radius:6px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -630,6 +635,7 @@ const STATE = {
   evidencias: {},
   alertShownFor: {}, // tracks OTs that already showed alert this session   // { "otId__campo": [{watermarked, original, name, type, phase}] }
   prevView: null,    // 'dashboard' | 'notifs' | 'verOT'
+  currentView: null, // 'notifDrill' | null
   navHistory: [],    // navigation stack
 };
 
@@ -821,7 +827,7 @@ function prevs(sec, phase='antes'){
           ? `<div style="position:relative;width:100%;height:100%"><img src="${thumbSrc}" alt="${f.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><div style="display:none;position:absolute;inset:0;background:#000;align-items:center;justify-content:center;font-size:1.8rem">▶</div></div>`
           : `<div style="width:100%;height:100%;background:#111;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#fff">▶</div>`)
       : `<img src="${f.url||f.watermarked}" alt="${f.name}" onerror="if(this.dataset.fb==='2')return;if(!this.dataset.fb){this.dataset.fb='1';const fb='${(f.watermarked||f.url||'').replace(/'/g,'%27')}';if(fb&&fb!==this.src){this.src=fb;return;}}this.dataset.fb='2';this.style.display='none';this.insertAdjacentHTML('afterend',\\'<div style=\"width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:var(--ink3);color:var(--g3);font-size:.6rem\">📷<span>Sin imagen</span></div>\\')" style="width:100%;height:100%;object-fit:cover">`;
-    return`<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${otId}','${sec}',${i})">
+    return`<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;width:100%;min-width:85px;min-height:85px;height:85px;background:var(--ink3);cursor:pointer" onclick="lbxOpen('${otId}','${sec}',${i})">
       ${thumb}
       <button onclick="event.stopPropagation();delEvidUI('${sec}',${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.7rem;z-index:2">✕</button>
       <span style="position:absolute;bottom:3px;left:3px;background:rgba(0,0,0,.72);color:#fff;font-size:.48rem;padding:1px 4px;border-radius:3px;max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
@@ -3526,6 +3532,7 @@ function updateNotifBadge(){
 
 /* ── Panel de notificaciones ── */
 function panelNotifs(){
+  STATE.currentView=null;
   const u=STATE.currentUser;
   const allNotifs=STATE.notifs||[];
   const notifs = u?.rol==='tabasco'
@@ -3599,9 +3606,7 @@ function panelNotifs(){
             <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;overflow:hidden"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--orange));border-radius:2px"></div></div>
           </div>
           <div style="background:var(--ink3);border-radius:8px;padding:8px;text-align:center">
-            <div style="font-size:.7rem;color:var(--g3);margin-bottom:2px">Levantamiento</div>
-            <div style="font-size:1.1rem;font-weight:800;color:${levPct>=100?'var(--ok)':'var(--gold)'}">${levPct}%${levPct>=100?' ✅':''}</div>
-            <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;overflow:hidden"><div style="width:${levPct}%;height:100%;background:${levPct>=100?'var(--ok)':'var(--gold)'};border-radius:2px"></div></div>
+            ${(()=>{const iA=ot.itemsAprobados||[];const dA=Object.values(ot.h4?.itemDone||{}).filter(Boolean).length;const pA=iA.length>0?Math.round((dA/iA.length)*100):levPct;const colA=pA>=100?'var(--ok)':iA.length>0?'var(--orange)':'var(--gold)';return `<div style="font-size:.7rem;color:var(--g3);margin-bottom:2px">Actividades</div><div style="font-size:1.1rem;font-weight:800;color:${colA}">${pA}%${pA>=100?' ✅':''}</div><div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:4px;overflow:hidden"><div style="width:${pA}%;height:100%;background:${colA};border-radius:2px"></div></div>`;})()}
           </div>
         </div>
         ${(()=>{
@@ -3658,6 +3663,7 @@ function panelNotifs(){
 }
 
 function _notifDrillOT(otId){
+  STATE.currentView='notifDrill';
   const ot=getOT(otId);if(!ot)return;
   const u=STATE.currentUser;
   const loc=ot.lugarTrabajo||'';
@@ -3719,7 +3725,11 @@ function _notifDrillOT(otId){
 
   // Desglose por sección
   html+=`<div class="card">
-    <div class="t-sm" style="font-weight:700;color:var(--cyan);margin-bottom:10px">📋 Secciones del Levantamiento</div>`;
+    <details>
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+      <span class="t-sm" style="font-weight:700;color:var(--cyan)">📋 Secciones del Levantamiento (${done}/${total})</span>
+      <span style="font-size:.72rem;color:var(--g3)">▼ ver detalle</span>
+    </summary>`;
   secDefs.forEach(s=>{
     const isDone=h3['lev_done_'+s.n];
     // Contar evidencias de esta sección
@@ -3754,7 +3764,7 @@ function _notifDrillOT(otId){
       <div style="font-size:.7rem;font-weight:700;color:${isDone?'var(--ok)':'var(--g3)'}">${isDone?'100%':'—'}</div>
     </div>`;
   });
-  html+=`</div>`;
+  html+=`</details></div>`;
 
   // Botón para ir al levantamiento / actividades / garantía según estado
   const u3=STATE.currentUser;
@@ -3827,25 +3837,6 @@ function _notifDrillOT(otId){
   }
 
   html+=accesoHTML;
-
-  // ── Sección Actividades ──
-  const itemsN=ot.itemsAprobados||[];
-  if(itemsN.length>0){
-    const doneN=Object.values(ot.h4?.itemDone||{}).filter(Boolean).length;
-    const pctAct=Math.round((doneN/itemsN.length)*100);
-    html+=`<div class="card" style="border-color:rgba(255,114,64,.2);background:rgba(255,114,64,.04)">
-      <div class="t-sm" style="font-weight:700;color:var(--orange);margin-bottom:8px">④ Actividades</div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span class="t-sm">Avance: <b>${pctAct}%</b></span>
-        <span class="t-sm" style="color:var(--ok)">${doneN}/${itemsN.length} ítems</span>
-      </div>
-      <div class="progress-wrap" style="margin-bottom:8px"><div class="progress-bar" style="width:${pctAct}%;background:var(--orange)"></div></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${u&&u.rol!=='tabasco'&&u.rol!=='admin'?'':`<button class="btn sm bd" onclick="STATE.prevView='notifs';iH4('${otId}')">④ Ver Actividades →</button>`}
-        ${ot.h4Saved?`<div class="badge bok" style="font-size:.7rem">✅ Guardadas</div>`:''}
-      </div>
-    </div>`;
-  }
 
   // ── Sección EPP ──
   if(ot.eppCompletado||ot.h4Saved){
@@ -4022,7 +4013,7 @@ function _verOTRender(otId){
       })()}
       ${ot.h3Saved?`
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-        <div class="t-sm" style="font-weight:700;color:var(--acc);margin-bottom:10px">📁 Documentos Levantamiento</div>
+        <div class="t-sm" style="font-weight:700;color:var(--cyan);margin-bottom:10px">📁 Documentos Levantamiento</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn sm bd" onclick="STATE.prevView='verOT';iH3('${ot.id}')">③ Ver Levantamiento</button>
           <button class="btn sm" onclick="genPDF('${ot.id}')">📄 PDF Informe + fotos</button>
@@ -4085,7 +4076,7 @@ function _verOTRender(otId){
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
           ${ot.h4?.obsCierre?`<div class="fg" style="margin-bottom:8px"><label>Obs. cierre:</label><div class="t-sm">${ot.h4.obsCierre}</div></div>`:''}
           <div style="margin-bottom:10px">
-          <div class="t-sm" style="font-weight:700;color:var(--acc);margin-bottom:8px">📁 Documentos Actividades</div>
+          <div class="t-sm" style="font-weight:700;color:var(--cyan);margin-bottom:8px">📁 Documentos Actividades</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn sm bd" onclick="STATE.prevView='verOT';iH4('${ot.id}')">④ Ver Actividades</button>
             <button class="btn sm" onclick="genPazSalvoPDF('${ot.id}')">📄 Paz y Salvo PDF</button>
@@ -4552,7 +4543,7 @@ function addItemAprob(otId){
   ot.itemsAprobados.push({...item,id:Date.now(),filas:[{id:0,ubic:'',cant:'',largo:'',ancho:'',alto:'',obs:''}]});
   addHist(ot,'Ítem aprobado agregado: '+item.nombre);
   // Notificar a técnicos
-  addNotif(`📦 Tabasco cargó ítem en ${ot.estacion} (${ot.numero}): ${item.nombre}`,ot.id,'actividad',ot.contratistaId);
+  // Fix #3: notificaciones de carga individual de ítems se omiten del panel (tipo 'carga_item' no aparece en lista)
   save();
   panelItemsAprobados(otId);
 }
@@ -6125,15 +6116,13 @@ function rS7(L){
     +'<option value="no"'+((d.solicita||'no')==='no'?' selected':'')+'>No</option><option value="si"'+(d.solicita==='si'?' selected':'')+'>Sí</option>'
     +'</select></div>'
     +(d.solicita==='si'
-      ?'<div class="st" style="font-size:.7rem">Medidas estación base</div>'
-        +'<div class="fr"><div class="fg"><label>Largo(m)</label><input type="number" step="0.01" value="'+(d.est_L||'')+'" onchange="s3k(\'placa_concreto\',\'est_L\',this.value)"'+(L?' readonly':'')+'></div>'
-        +'<div class="fg"><label>Ancho(m)</label><input type="number" step="0.01" value="'+(d.est_W||'')+'" onchange="s3k(\'placa_concreto\',\'est_W\',this.value)"'+(L?' readonly':'')+'></div></div>'
-        +'<div class="st" style="font-size:.7rem">Medidas a descontar (elementos existentes)</div>'
+      ?'<div class="st" style="font-size:.7rem">Medidas a descontar (elementos existentes)</div>'
         +elems.map(function(e,i){return '<div class="dyn">'
           +'<div class="dyn-header"><span class="t-sm">Elemento '+(i+1)+'</span>'+(i>0&&!L?'<button class="btn bd sm" onclick="delPlacaElem('+e.id+')">🗑</button>':'')+'</div>'
           +'<div class="fg"><label>Descripción</label><input type="text" value="'+escHtml(e.desc||'')+'" onchange="upPlacaElem('+e.id+',\'desc\',this.value)"'+(L?' readonly':'')+' placeholder="Qué elemento se descuenta..."></div>'
           +'<div class="fr"><div class="fg"><label>Largo(m)</label><input type="number" step="0.01" value="'+(e.largo||'')+'" onchange="upPlacaElem('+e.id+',\'largo\',this.value)"'+(L?' readonly':'')+'></div>'
           +'<div class="fg"><label>Ancho(m)</label><input type="number" step="0.01" value="'+(e.ancho||'')+'" onchange="upPlacaElem('+e.id+',\'ancho\',this.value)"'+(L?' readonly':'')+'></div></div>'
+          +fi('placa_elem_'+e.id+'_foto','Foto elemento '+(i+1),'',false,'image/*',false,'antes',L)
           +'</div>';}).join('')
         +(!L?'<button class="btn sm bd" onclick="addPlacaElem()">+ Elemento a descontar</button>':'')
         +fi('placa_foto','Foto estado actual piso *','',false,'image/*',true,'antes',L)
@@ -6152,17 +6141,17 @@ function rS8(L){
     +'<div class="fg"><label>Tipo de concertina</label><textarea onchange="s3k(\'concertina\',\'desc\',this.value)"'+(L?' readonly':'')+'>'+escHtml(d.desc||'')+'</textarea></div>'
     +'<div class="fg"><label>Estado</label><select onchange="s3k(\'concertina\',\'estado\',this.value)"'+(L?' disabled':'')+'>'
     +'<option value="">—</option>'+['Bueno','Regular','Malo'].map(function(s){return '<option'+(d.estado===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
-    +'<div class="fg" style="display:flex;align-items:center;gap:10px"><label style="margin-bottom:0">¿Requiere reparación?</label>'
-    +'<select style="width:auto;margin-left:8px" onchange="s3k(\'concertina\',\'reqRep\',this.value);rp(3)"'+(L?' disabled':'')+'>'
-    +'<option value="no"'+((d.reqRep||'no')==='no'?' selected':'')+'>No</option><option value="si"'+(d.reqRep==='si'?' selected':'')+'>Sí</option>'
-    +'</select></div>'
-    +(d.reqRep==='si'?'<div class="fg"><label>Largo total a reparar(m)</label><input type="number" step="0.01" value="'+(d.largo||'')+'"'+(L?' readonly':'')+' onchange="s3k(\'concertina\',\'largo\',this.value)"></div>':'')
     +'<div class="st" style="font-size:.7rem">Evidencias Externas</div>'
     +fi('conc_ext_A','A. Cara frontal *','',false,'image/*',true,'antes',L)
     +fi('conc_ext_B','B. Cara lateral derecha','',false,'image/*',false,'antes',L)
     +fi('conc_ext_C','C. Cara posterior','',false,'image/*',false,'antes',L)
     +fi('conc_ext_D','D. Cara lateral izquierda','',false,'image/*',false,'antes',L)
     +fi('conc_ext_vid','E. Video recorrido','',false,'video/*',false,'antes',L)
+    +'<div class="fg" style="display:flex;align-items:center;gap:10px"><label style="margin-bottom:0">¿Requiere reparación?</label>'
+    +'<select style="width:auto;margin-left:8px" onchange="s3k(\'concertina\',\'reqRep\',this.value);rp(3)"'+(L?' disabled':'')+'>'
+    +'<option value="no"'+((d.reqRep||'no')==='no'?' selected':'')+'>No</option><option value="si"'+(d.reqRep==='si'?' selected':'')+'>Sí</option>'
+    +'</select></div>'
+    +(d.reqRep==='si'?'<div class="fg"><label>Largo total a reparar(m)</label><input type="number" step="0.01" value="'+(d.largo||'')+'"'+(L?' readonly':'')+' onchange="s3k(\'concertina\',\'largo\',this.value)"></div>':'')
     +(d.reqRep==='si'?'<div class="st" style="font-size:.7rem">Tramos a Reparar</div>'
       +(d.reparaciones||[]).map(function(r,i){return rRepEntry('concertina',r,i,L);}).join('')
       +(!L?'<button class="btn sm bd" onclick="addRep(\'concertina\')">+ Tramo</button>':'')
@@ -6464,11 +6453,9 @@ function rS13(L){
     +'<div class="fg"><label>Ancho(m)</label><input type="number" step="0.01" value="'+(h.placa_eq_ancho||'')+'"'+(L?' readonly':'')+' onchange="s3f(\'placa_eq_ancho\',this.value)"></div></div>'
     +fi('placa_equipo_A','A. Foto placa de equipos *','',false,'image/*',true,'antes',L)
     +fi('placa_equipo_B','B. Foto rieles de los equipos','',false,'image/*',false,'antes',L)
-    +'<div class="fg" style="display:flex;align-items:center;gap:10px"><label style="margin-bottom:0">Cantidad de gabinetes</label>'
-    +'<input type="number" min="1" value="'+nGab+'"'+(L?' readonly':'')+' style="width:70px" onchange="s3f(\'placa_eq_ngab\',this.value);rp(3)"></div>'
+    +_spin('Cantidad de gabinetes','placa_eq_ngab','',nGab,L,1)
     +Array.from({length:nGab},function(_,i){return fi('placa_gab_'+i,'C. Foto gabinete '+(i+1)+' *','',false,'image/*',true,'antes',L);}).join('')
-    +'<div class="fg" style="display:flex;align-items:center;gap:10px"><label style="margin-bottom:0">Tomacorrientes</label>'
-    +'<input type="number" min="0" value="'+nTm+'"'+(L?' readonly':'')+' style="width:70px" onchange="s3f(\'placa_eq_ntoma\',this.value);rp(3)"></div>'
+    +_spin('Tomacorrientes','placa_eq_ntoma','',nTm,L,0)
     +Array.from({length:nTm},function(_,i){return fi('placa_toma_'+i,'D. Foto tomacorriente '+(i+1)+' *','',false,'image/*',true,'antes',L);}).join('')
     +'</div>';}
 
@@ -6480,7 +6467,7 @@ function rS14(L){
     +'<div class="card">'
     +'<div class="fg" style="background:rgba(255,182,39,.08);border:1px solid rgba(255,182,39,.3);border-radius:8px;padding:10px;margin-bottom:12px">'
     +'<label style="font-weight:700;color:var(--gold)">⚠️ ¿La línea de vida se encuentra vigente?</label>'
-    +'<div style="display:flex;gap:12px;margin-top:8px">'
+    +'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">'
     +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.88rem">'
     +'<input type="radio" name="lv_vig_'+(ot?.id||'x')+'" value="si"'+(vig==='si'?' checked':'')+' '+(L?'disabled ':'')+' onchange="s3f(\'lv_vigente\',\'si\');rp(3)"> ✅ Sí, vigente</label>'
     +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.88rem">'
@@ -7706,6 +7693,8 @@ function _validateLevSec(ot,secNum){
         const t0=ts2[0];
         reqField(t0.desc,'Tipo de transporte');
         reqFoto('tp_'+t0.id+'_tipo','Foto transporte');
+        reqFoto('tp_'+t0.id+'_vid','Video del recorrido D');
+        reqFoto('tp_'+t0.id+'_pB','Punto B E');
       }
       break;
     }
@@ -7996,9 +7985,13 @@ window.fbSaveEstado = async function(){
 };
 
 // ── onSnapshot: escucha "estado/global" → actualiza STATE y rerenderiza
+var _snapTimer;
 db.collection('estado').doc('global').onSnapshot(
   { includeMetadataChanges: true },
   function(snap){
+    if(STATE.currentView==='notifDrill') return;
+    clearTimeout(_snapTimer);
+    _snapTimer=setTimeout(function(){
     // Ignorar escrituras pendientes propias (evita loop)
     if(!snap.exists || snap.metadata.hasPendingWrites) return;
     const data = snap.data();
@@ -8027,6 +8020,7 @@ db.collection('estado').doc('global').onSnapshot(
     } else if(typeof routeByRole==='function' && STATE.currentUser){
       routeByRole();  // en dashboard/lista → re-renderizar vista completa
     }
+    },800); // fin debounce _snapTimer
   },
   function(err){ console.warn('onSnapshot error:',err); }
 );
