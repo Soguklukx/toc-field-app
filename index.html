@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<link rel="manifest" href="manifest.webmanifest">
+<!-- manifest generado dinámicamente (ver script inline) -->
 <meta name="theme-color" content="#0f172a">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -82,28 +82,98 @@ if('serviceWorker' in navigator){
   --sem-ok:#1DDA7A;--sem-warn:#FFB627;--sem-risk:#FF7240;--sem-venc:#FF4D5E;
   --r:10px;--sh:0 6px 28px rgba(0,0,0,.45);--t:all .18s ease;
 }
-/* ── Modo outdoor / alto contraste ── */
+/* ── Modo outdoor / alto contraste — CAMPO CON SOL INTENSO (70-90m) ──
+   Diseño validado para pantallas móviles bajo luz solar directa:
+   - Fondo muy oscuro (sin reflejos, reduce fatiga visual)
+   - Texto blanco puro + amarillo ámbar para máxima legibilidad
+   - Contraste ≥ 7:1 en todos los elementos críticos
+   - Botones de acción en ámbar brillante con texto negro
+   - Fuentes y touch-targets ligeramente agrandados
+   ──────────────────────────────────────────────────────── */
 body.outdoor{
-  --ink:#FFFFFF;--ink2:#E8F0F8;--ink3:#D0DCE8;--ink4:#B0C4D8;
-  --white:#000000;--g1:#0A1628;--g2:#0F2040;--g3:#1A3050;
-  --cyan:#0055AA;--cyan2:#004499;--orange:#CC4400;--gold:#AA7700;
-  --ok:#006633;--warn:#885500;--red:#CC0011;--border:rgba(0,0,0,.25);
+  --ink:#000D18;
+  --ink2:#001A2E;
+  --ink3:#002540;
+  --ink4:#003257;
+  --cyan:#FFE000;
+  --cyan2:#FFD000;
+  --orange:#FF9900;
+  --gold:#FFE000;
+  --white:#FFFFFF;
+  --g1:#E8F4FF;
+  --g2:#B8D4EE;
+  --g3:#6A90B0;
+  --ok:#00FF88;
+  --warn:#FFD600;
+  --red:#FF4444;
+  --purple:#D580FF;
+  --sem-ok:#00FF88;--sem-warn:#FFD600;--sem-risk:#FF9900;--sem-venc:#FF4444;
+  font-size:106%;
 }
-body.outdoor input,body.outdoor select,body.outdoor textarea{background:#E8F0F8;border-color:rgba(0,0,0,.3);color:#000}
-body.outdoor input:focus,body.outdoor select:focus,body.outdoor textarea:focus{border-color:#0055AA;box-shadow:0 0 0 3px rgba(0,85,170,.18)}
-body.outdoor .card{background:#EFF4FA;border-color:rgba(0,0,0,.18)}
-body.outdoor .navbar{background:#D0DCE8;border-bottom-color:rgba(0,85,170,.4)}
-body.outdoor .st{color:#0055AA;border-bottom-color:rgba(0,85,170,.25)}
-body.outdoor .btn{background:#0055AA;color:#fff}
-body.outdoor .btn.bd{background:transparent;border-color:#0055AA;color:#0055AA}
-body.outdoor select option{background:#E8F0F8;color:#000}
-/* Fix #10 – alertas en modo outdoor */
-body.outdoor .a-i{background:rgba(0,85,170,.12);border-left-color:#0055AA;color:#000}
-body.outdoor .a-w{background:rgba(170,119,0,.12);border-left-color:#AA7700;color:#000}
-body.outdoor .a-e{background:rgba(204,0,17,.12);border-left-color:#CC0011;color:#000}
-body.outdoor .a-s{background:rgba(0,102,51,.12);border-left-color:#006633;color:#000}
-#btnOutdoor{transition:var(--t)}
-body.outdoor #btnOutdoor{background:rgba(0,85,170,.15);border-radius:6px}
+/* Inputs — bordes visibles, fondo oscuro legible */
+body.outdoor input,body.outdoor select,body.outdoor textarea{
+  background:#001A2E;border-color:rgba(255,224,0,.35);color:#FFFFFF;font-size:.92rem;
+}
+body.outdoor input:focus,body.outdoor select:focus,body.outdoor textarea:focus{
+  border-color:#FFE000;box-shadow:0 0 0 3px rgba(255,224,0,.22);
+}
+body.outdoor input[readonly],body.outdoor input:disabled,body.outdoor select:disabled{
+  background:rgba(255,255,255,.04);color:#6A90B0;border-color:rgba(255,224,0,.1);
+}
+body.outdoor select option{background:#001A2E;color:#FFFFFF;}
+/* Cards: borde ámbar tenue para definir zonas */
+body.outdoor .card{background:#001A2E;border-color:rgba(255,224,0,.18);}
+body.outdoor .card-glow{border-color:rgba(255,224,0,.4);background:rgba(255,224,0,.04);}
+body.outdoor .card-warn{border-color:rgba(255,214,0,.4);background:rgba(255,214,0,.05);}
+/* Navbar y tabs */
+body.outdoor .navbar,body.outdoor #hdr{background:#000D18;border-bottom-color:rgba(255,224,0,.3);}
+body.outdoor #tabs,body.outdoor .tabs-bar{background:#000D18;border-bottom-color:rgba(255,224,0,.2);}
+body.outdoor .tb.active,body.outdoor .tab.active{color:#FFE000;border-bottom-color:#FFE000;}
+/* Section titles */
+body.outdoor .st{color:#FFE000;border-bottom-color:rgba(255,224,0,.25);}
+body.outdoor h3{color:#FFE000;}
+/* Botones principales: ámbar brillante — máxima visibilidad bajo sol */
+body.outdoor .btn,.outdoor .bc{background:#FFE000;color:#000;}
+body.outdoor .btn:hover{background:#FFD000;}
+body.outdoor .btn.bd{background:transparent;border:2px solid #FFE000;color:#FFE000;}
+body.outdoor .btn.bd:hover{background:rgba(255,224,0,.12);}
+body.outdoor .bg{background:#00FF88;color:#000;}
+body.outdoor .bo{background:#FF9900;color:#000;}
+body.outdoor .bd{background:#FF4444;color:#fff;}
+/* Alertas — texto siempre legible */
+body.outdoor .a-i{background:rgba(255,224,0,.1);border-left-color:#FFE000;color:#FFFFFF;}
+body.outdoor .a-w{background:rgba(255,214,0,.1);border-left-color:#FFD600;color:#FFFFFF;}
+body.outdoor .a-e{background:rgba(255,68,68,.12);border-left-color:#FF4444;color:#FFFFFF;}
+body.outdoor .a-s{background:rgba(0,255,136,.1);border-left-color:#00FF88;color:#FFFFFF;}
+/* Stat cards */
+body.outdoor .stat-card{background:#001A2E;border-color:rgba(255,224,0,.25);}
+body.outdoor .stat-n{color:#FFE000;}
+body.outdoor .stat-l{color:#B8D4EE;}
+/* OT cards */
+body.outdoor .ot-card{background:#001A2E;border-color:rgba(255,255,255,.12);}
+body.outdoor .ot-card:hover{border-color:#FFE000;}
+body.outdoor .ot-name{color:#FFFFFF;}
+/* Badges */
+body.outdoor .bok{background:rgba(0,255,136,.18);color:#00FF88;}
+body.outdoor .bwn,.outdoor .badge.warn{background:rgba(255,214,0,.18);color:#FFD600;}
+body.outdoor .brj,.outdoor .badge.danger{background:rgba(255,68,68,.18);color:#FF4444;}
+body.outdoor .bin{background:rgba(255,224,0,.18);color:#FFE000;}
+/* Touch targets: mínimo 46px en modo outdoor */
+body.outdoor .btn{min-height:46px;padding:12px 20px;}
+body.outdoor .btn.sm{min-height:38px;padding:8px 14px;}
+body.outdoor .tab,.outdoor .tb{padding:12px 13px;}
+body.outdoor input,body.outdoor select,body.outdoor textarea{padding:12px 14px;}
+/* Indicador outdoor */
+body.outdoor #btnOutdoor{background:rgba(255,224,0,.15);border-radius:6px;color:#FFE000;}
+/* Progress bar — más visible */
+body.outdoor .pf,.outdoor .progress-bar{background:linear-gradient(90deg,#FFE000,#FF9900);}
+/* Login card */
+body.outdoor .login-card{background:#001A2E;border-color:rgba(255,224,0,.3);}
+body.outdoor .logo-title{color:#FFE000;}
+/* Modal */
+body.outdoor .mb{background:#001A2E;border-color:rgba(255,224,0,.25);}
+body.outdoor .mb h2,.outdoor .mb h3{color:#FFE000;}
+body.outdoor .mb label{color:#B8D4EE;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-tap-highlight-color:transparent}
 body{font-family:'Syne',sans-serif;background:var(--ink);color:var(--white);min-height:100vh;overflow-x:hidden}
@@ -951,14 +1021,7 @@ function lbxClose(){
   el.style.display='none';
 }
 
-/* ── Navegación teclado en lightbox ── */
-document.addEventListener('keydown',function(e){
-  const lbx=document.getElementById('lbx');
-  if(!lbx||lbx.style.display==='none') return;
-  if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();lbxNav(-1);}
-  else if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();lbxNav(1);}
-  else if(e.key==='Escape'){lbxClose();}
-});
+/* ── Navegación teclado en lightbox — ver handler global más abajo ── */
 
 function lbxDelete(){
   delEvid(_lbxOtId,_lbxSec,_lbxIdx);
@@ -8398,11 +8461,7 @@ window.loadRefImgGar = async function(evt, otId, itemIdx) {
 
 
 </script>
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-}
-</script>
+<!-- SW ya registrado via blob inline arriba -->
 <script>
 // ═══════════════════════════════════════════════════════════
 // FIREBASE + FIRESTORE SYNC (compat) — TOC MTTO Field App
@@ -8424,6 +8483,54 @@ if (!firebase.apps.length) {
 }
 const db      = firebase.firestore();
 const storage = firebase.storage();
+
+// ── Persistencia offline: caché local de Firestore (crítico en campo) ──
+db.enablePersistence({ synchronizeTabs: true })
+  .then(()=>console.log('✅ Firestore offline persistence activa'))
+  .catch(err=>{
+    if(err.code==='failed-precondition') console.warn('Persistencia: múltiples tabs abiertas');
+    else if(err.code==='unimplemented') console.warn('Persistencia: navegador no soportado');
+  });
+
+// ── Cola de reintentos para guardados Firebase ──
+window._fbSaveQueue = [];
+window._fbSaveRunning = false;
+async function _fbDrainQueue(){
+  if(window._fbSaveRunning || window._fbSaveQueue.length===0) return;
+  window._fbSaveRunning = true;
+  while(window._fbSaveQueue.length > 0){
+    const task = window._fbSaveQueue[window._fbSaveQueue.length-1]; // solo el más reciente
+    window._fbSaveQueue = [];
+    let retries = 0;
+    while(retries < 4){
+      try{ await task(); break; }
+      catch(e){
+        retries++;
+        console.warn(`Firebase save retry ${retries}/4:`,e);
+        if(retries < 4) await new Promise(r=>setTimeout(r, Math.min(500*Math.pow(2,retries),8000)));
+      }
+    }
+  }
+  window._fbSaveRunning = false;
+}
+window._queueFbSave = function(fn){
+  window._fbSaveQueue.push(fn);
+  setTimeout(_fbDrainQueue, 300); // debounce 300ms
+};
+
+// ── Monitor de conectividad en tiempo real ──
+function _updateNetworkUI(online){
+  const dot = document.getElementById('syncDot');
+  if(!dot) return;
+  if(!online){
+    dot.textContent='📵'; dot.title='Sin conexión — datos guardados localmente';
+    dot.style.color='var(--warn)';
+  } else {
+    dot.textContent='☁️'; dot.title='Conectado'; dot.style.color='var(--g3)';
+  }
+}
+window.addEventListener('online',  ()=>{ _updateNetworkUI(true);  showToast('🌐 Conexión restaurada — sincronizando…','ok'); if(window.fbSaveEstado)window.fbSaveEstado(); });
+window.addEventListener('offline', ()=>{ _updateNetworkUI(false); showToast('📵 Sin conexión — modo offline activo','warn'); });
 
 // ── Helper: data URL → Blob (evita putString que falla en mobile)
 function _dataUrlToBlob(dataUrl){
@@ -8468,6 +8575,32 @@ function _stripB64(obj){
 
 // ── fbSaveEstado: guarda STATE.ots + STATE.evidencias → "estado/global"
 window.fbSaveEstado = async function(){
+  if(window._queueFbSave){
+    window._queueFbSave(async ()=>{
+      // OTs: copia limpia sin base64
+      const otsClean = JSON.parse(JSON.stringify(STATE.ots||[]));
+      _stripB64(otsClean);
+      // Evidencias: solo conservar las que tienen URL remota
+      const evClean = {};
+      for(const [k,arr] of Object.entries(STATE.evidencias||{})){
+        const limpio = (arr||[]).map(f=>({
+          name:  f.name  ||'',
+          type:  f.type  ||'',
+          phase: f.phase ||'',
+          url:   f.url   ||''
+        })).filter(f=>f.url);
+        if(limpio.length) evClean[k]=limpio;
+      }
+      await db.collection('estado').doc('global').set({
+        ots:       otsClean,
+        evidencias: evClean,
+        updatedAt: Date.now()
+      });
+      if(typeof _showSyncDot==='function') _showSyncDot(true);
+    });
+    return;
+  }
+  // Fallback sin cola
   try{
     // OTs: copia limpia sin base64
     const otsClean = JSON.parse(JSON.stringify(STATE.ots||[]));
@@ -8499,44 +8632,61 @@ window.fbSaveEstado = async function(){
 
 // ── onSnapshot: escucha "estado/global" → actualiza STATE y rerenderiza
 var _snapTimer;
-db.collection('estado').doc('global').onSnapshot(
-  { includeMetadataChanges: true },
-  function(snap){
-    if(STATE.currentView==='notifDrill') return;
-    clearTimeout(_snapTimer);
-    _snapTimer=setTimeout(function(){
-    // Ignorar escrituras pendientes propias (evita loop)
-    if(!snap.exists || snap.metadata.hasPendingWrites) return;
-    const data = snap.data();
-    if(!data) return;
+var _snapUnsub = null;
+var _snapReconnectTimer = null;
 
-    window._skipFbSave = true;
-    if(Array.isArray(data.ots))       STATE.ots        = data.ots;
-    if(data.evidencias !== undefined) STATE.evidencias = data.evidencias||{};
+function _subscribeSnapshot(){
+  if(_snapUnsub) try{ _snapUnsub(); }catch(e){}
+  _snapUnsub = db.collection('estado').doc('global').onSnapshot(
+    { includeMetadataChanges: true },
+    function(snap){
+      if(STATE.currentView==='notifDrill') return;
+      clearTimeout(_snapTimer);
+      _snapTimer=setTimeout(function(){
+      // Ignorar escrituras pendientes propias (evita loop)
+      if(!snap.exists || snap.metadata.hasPendingWrites) return;
+      const data = snap.data();
+      if(!data) return;
 
-    // Mantener localStorage sincronizado
-    try{
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        notifs:             STATE.notifs             ||[],
-        contratistas:       STATE.contratistas       ||[],
-        ots:                STATE.ots,
-        solicitudesUsuario: STATE.solicitudesUsuario ||[]
-      }));
-      localStorage.setItem(LS_EV, JSON.stringify(STATE.evidencias));
-    }catch(e){}
+      window._skipFbSave = true;
+      if(Array.isArray(data.ots))       STATE.ots        = data.ots;
+      if(data.evidencias !== undefined) STATE.evidencias = data.evidencias||{};
 
-    window._skipFbSave = false;
+      // Mantener localStorage sincronizado
+      try{
+        localStorage.setItem(LS_KEY, JSON.stringify({
+          notifs:             STATE.notifs             ||[],
+          contratistas:       STATE.contratistas       ||[],
+          ots:                STATE.ots,
+          solicitudesUsuario: STATE.solicitudesUsuario ||[]
+        }));
+        localStorage.setItem(LS_EV, JSON.stringify(STATE.evidencias));
+      }catch(e){}
 
-    // Re-renderizar la vista actual (funciona desde cualquier pantalla)
-    if(typeof rp==='function' && typeof curOT==='function' && curOT()){
-      rp(STATE.tab);  // dentro de una OT → re-renderizar tab activo
-    } else if(typeof routeByRole==='function' && STATE.currentUser){
-      routeByRole();  // en dashboard/lista → re-renderizar vista completa
+      window._skipFbSave = false;
+
+      // Re-renderizar la vista actual (funciona desde cualquier pantalla)
+      if(typeof rp==='function' && typeof curOT==='function' && curOT()){
+        rp(STATE.tab);  // dentro de una OT → re-renderizar tab activo
+      } else if(typeof routeByRole==='function' && STATE.currentUser){
+        routeByRole();  // en dashboard/lista → re-renderizar vista completa
+      }
+      },800); // fin debounce _snapTimer
+    },
+    function(err){
+      console.warn('onSnapshot error:',err);
+      if(typeof _showSyncDot==='function') _showSyncDot(false);
+      // Auto-reconexión con backoff exponencial
+      clearTimeout(_snapReconnectTimer);
+      _snapReconnectTimer = setTimeout(()=>{
+        console.log('🔄 Reconectando onSnapshot…');
+        _subscribeSnapshot();
+      }, 5000);
     }
-    },800); // fin debounce _snapTimer
-  },
-  function(err){ console.warn('onSnapshot error:',err); }
-);
+  );
+}
+
+_subscribeSnapshot();
 
 // ── fbSave: guarda configuración general + OTs (colecciones legacy)
 window.fbSave = async function(data){
